@@ -9,7 +9,7 @@ show_help() {
     echo "Usage: ./update_wallpaper.sh [options]"
     echo ""
     echo "Options:"
-    echo "  --style <name>   Override the default style (curves, grid, glitch, smoke, nebula, fractal, expressive)"
+    echo "  --style <name>   Override the default style (curves, grid, glitch, smoke, nebula, fractal, expressive, vaporwave)"
     echo "  --width <px>     Override the canvas width"
     echo "  --height <px>    Override the canvas height"
     echo "  --help           Show this help message"

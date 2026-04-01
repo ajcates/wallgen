@@ -11,6 +11,7 @@ import { DoubleHelixFractalStyle } from './src/styles/DoubleHelixFractalStyle.js
 import { CyberCircuitStyle } from './src/styles/CyberCircuitStyle.js';
 import { EnergyFlowStyle } from './src/styles/EnergyFlowStyle.js';
 import { SynapticEchoStyle } from './src/styles/SynapticEchoStyle.js';
+import { VaporwaveSunsetStyle } from './src/styles/VaporwaveSunsetStyle.js';
 import { loadLogs } from './src/data/logParser.js';
 
 import { mkdir } from 'fs/promises';
@@ -32,7 +33,7 @@ Usage: node main.js [options]
 
 Options:
   --style <name>   The visual style to use.
-                   Available: curves (default), grid, glitch, smoke, nebula, fractal, zigzag, expressive, helix, circuit, energy, synapse
+                   Available: curves (default), grid, glitch, smoke, nebula, fractal, zigzag, expressive, helix, circuit, energy, synapse, vaporwave
   --noise <0.0-1.0> Noise level for glitch style (default: 1.0)
   --width <px>     Canvas width (default: 1080)
   --height <px>    Canvas height (default: 2400)
@@ -102,6 +103,8 @@ async function main() {
     style = new EnergyFlowStyle();
   } else if (styleName === 'synapse') {
     style = new SynapticEchoStyle();
+  } else if (styleName === 'vaporwave') {
+    style = new VaporwaveSunsetStyle();
   } else {
     style = new FlowingCurvesStyle({ steps: 30, caSteps: 15 });
   }
