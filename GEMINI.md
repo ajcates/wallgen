@@ -46,6 +46,15 @@ Every style in GWF extends the base `Style` class and follows a strict lifecycle
 - **`curves`** (`FlowingCurvesStyle`): The original style. Uses cellular automata to create glowing, magnetic paths.
 - **`grid`** (`GeometricGridStyle`): Maps entries to a structured grid of rotating polygons.
 - **`glitch`** (`GlitchStyle`): A demonstration of the `transform` layer. Injects noise into time/battery data and renders it as retro digital artifacts.
+- **`smoke`** (`CrystalSmokeStyle`): A style featuring 3D shards and volumetric smoke effects.
+- **`nebula`** (`NebulaConstellationStyle`): Deep space nebulae with glowing stars and gas clouds.
+- **`fractal`** (`FractalGeometryStyle`): Recursive geometric patterns with kaleidoscopic symmetry.
+- **`zigzag`** (`ZigZagFractalStyle`): Angular, sharp-edged fractals with high-contrast gradients.
+- **`expressive`** (`ExpressiveMaterialStyle`): Bold, painterly strokes with fluid transitions.
+- **`helix`** (`DoubleHelixFractalStyle`): Intertwining spiral structures with organic movement.
+- **`circuit`** (`CyberCircuitStyle`): A high-tech aesthetic with glowing traces and data nodes.
+- **`energy`** (`EnergyFlowStyle`): Abstract energy flows and iridescent oil-in-water effects with orbiting particles.
+- **`synapse`** (`SynapticEchoStyle`): A high-tech neural web representing data transmission with interconnected nodes and synaptic pulses.
 
 ---
 

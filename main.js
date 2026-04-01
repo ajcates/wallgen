@@ -6,6 +6,11 @@ import { CrystalSmokeStyle } from './src/styles/CrystalSmokeStyle.js';
 import { NebulaConstellationStyle } from './src/styles/NebulaConstellationStyle.js';
 import { FractalGeometryStyle } from './src/styles/FractalGeometryStyle.js';
 import { ZigZagFractalStyle } from './src/styles/ZigZagFractalStyle.js';
+import { ExpressiveMaterialStyle } from './src/styles/ExpressiveMaterialStyle.js';
+import { DoubleHelixFractalStyle } from './src/styles/DoubleHelixFractalStyle.js';
+import { CyberCircuitStyle } from './src/styles/CyberCircuitStyle.js';
+import { EnergyFlowStyle } from './src/styles/EnergyFlowStyle.js';
+import { SynapticEchoStyle } from './src/styles/SynapticEchoStyle.js';
 import { loadLogs } from './src/data/logParser.js';
 
 import { mkdir } from 'fs/promises';
@@ -27,7 +32,8 @@ Usage: node main.js [options]
 
 Options:
   --style <name>   The visual style to use.
-                   Available: curves (default), grid, glitch, smoke
+                   Available: curves (default), grid, glitch, smoke, nebula, fractal, zigzag, expressive, helix, circuit, energy, synapse
+  --noise <0.0-1.0> Noise level for glitch style (default: 1.0)
   --width <px>     Canvas width (default: 1080)
   --height <px>    Canvas height (default: 2400)
   --output <path>  Directory to save the generated wallpaper (default: ./wallpapers)
@@ -76,7 +82,8 @@ async function main() {
   if (styleName === 'grid') {
     style = new GeometricGridStyle({ columns: 10, rows: 5 });
   } else if (styleName === 'glitch') {
-    style = new GlitchStyle({ noiseLevel: 0.5 });
+    const noise = parseFloat(getArg('noise', '1.0'));
+    style = new GlitchStyle({ noiseLevel: noise });
   } else if (styleName === 'smoke') {
     style = new CrystalSmokeStyle();
   } else if (styleName === 'nebula') {
@@ -85,6 +92,16 @@ async function main() {
     style = new FractalGeometryStyle();
   } else if (styleName === 'zigzag') {
     style = new ZigZagFractalStyle();
+  } else if (styleName === 'expressive') {
+    style = new ExpressiveMaterialStyle();
+  } else if (styleName === 'helix') {
+    style = new DoubleHelixFractalStyle();
+  } else if (styleName === 'circuit') {
+    style = new CyberCircuitStyle();
+  } else if (styleName === 'energy') {
+    style = new EnergyFlowStyle();
+  } else if (styleName === 'synapse') {
+    style = new SynapticEchoStyle();
   } else {
     style = new FlowingCurvesStyle({ steps: 30, caSteps: 15 });
   }

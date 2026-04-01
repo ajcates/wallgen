@@ -34,7 +34,8 @@ echo "3) glitch (Cyber Glitch)"
 echo "4) smoke (Crystal Shards & Volumetric Smoke)"
 echo "5) nebula (Cosmic Clusters)"
 echo "6) fractal (Recursive Mandalas)"
-read -p "Choose a style [1-6]: " style_choice
+echo "7) expressive (Material 3 Expressive - Fresh every time)"
+read -p "Choose a style [1-7]: " style_choice
 
 case $style_choice in
     1) STYLE="curves" ;;
@@ -43,6 +44,7 @@ case $style_choice in
     4) STYLE="smoke" ;;
     5) STYLE="nebula" ;;
     6) STYLE="fractal" ;;
+    7) STYLE="expressive" ;;
     *) STYLE="curves" ;;
 esac
 

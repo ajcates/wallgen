@@ -7,7 +7,9 @@
   "author": "",
   "main": "gen1.js",
   "dependencies": {
-    "@napi-rs/canvas": "^0.1.97"
+    "@napi-rs/canvas": "^0.1.97",
+    "koa": "^3.1.2",
+    "koa-static": "^5.0.0"
   },
   "scripts": {
     "test": "node --test tests/*.test.js"

@@ -1,19 +1,35 @@
 import { Style } from '../core/Style.js';
 import { mapRange, lerp, randomRange } from '../utils/math.js';
+import * as colorUtils from '../utils/color.js';
+import * as canvasUtils from '../utils/canvas.js';
 
 /**
- * FractalGeometryStyle: A Multi-Chromatic, high-contrast visualization.
- * Every fractal has a unique color, creating a vibrant, rainbow field.
+ * FractalGeometryStyle: A Material 3 inspired recursive visualization.
+ * Uses harmonized palettes and adaptive contrast for a modern look.
  */
 export class FractalGeometryStyle extends Style {
   constructor(config = {}) {
     super(config);
     this.mandalaNodes = [];
+    this.palette = [];
   }
 
   async init(data) {
     await super.init(data);
+    if (!data || data.length === 0) return;
+
+    const latest = data[data.length - 1];
+    this._initPalette(latest);
     this._generateMandala(data);
+  }
+
+  _initPalette(entry) {
+    const hueOffset = Math.random() * 360;
+    const baseHue = (mapRange(entry.hh + (entry.mm / 60), 0, 24, 0, 360) + hueOffset) % 360;
+    const saturation = mapRange(entry.fm, 0, 100, 80, 95); 
+    
+    this.isLightMode = entry.hh >= 6 && entry.hh < 18;
+    this.palette = colorUtils.generateMaterialPalette(baseHue, saturation, this.isLightMode);
   }
 
   _generateMandala(data) {
@@ -32,17 +48,22 @@ export class FractalGeometryStyle extends Style {
       const spokes = Math.max(1, Math.min(6, Math.floor(mapRange(pt % 200, 0, 200, 3, 6))));
       const angleStep = (Math.PI * 2) / spokes;
       
-      // UNIQUE COLOR PER FRACTAL: Each entry gets a random base hue
-      const nodeHue = Math.random() * 360;
+      // Select a color from the Material palette
+      const paletteColor = this.palette[index % (this.palette.length - 1)];
+      const nodeColor = {
+        h: (paletteColor.h + randomRange(-20, 20)) % 360,
+        s: Math.min(100, paletteColor.s + randomRange(-10, 10)),
+        l: Math.min(100, Math.max(0, paletteColor.l + randomRange(-10, 10)))
+      };
 
-      const scale = mapRange(bp, 0, 100, 0.9, 1.4);
+      const scale = mapRange(bp, 0, 100, 0.8, 1.3);
       
       const reverseIndex = (data.length - 1) - index; 
       let opacity = 0;
-      if (reverseIndex < 10) {
-        opacity = 0.9;
-      } else if (reverseIndex < 30) {
-        opacity = mapRange(reverseIndex, 10, 30, 0.9, 0);
+      if (reverseIndex < 8) {
+        opacity = 0.95;
+      } else if (reverseIndex < 25) {
+        opacity = mapRange(reverseIndex, 8, 25, 0.95, 0);
       }
       
       return {
@@ -51,22 +72,20 @@ export class FractalGeometryStyle extends Style {
         depth,
         spokes,
         angleStep,
-        baseHue: nodeHue,
+        color: nodeColor,
         scale,
-        lineWidth: Math.max(0.1, mapRange(fm, 0, 100, 1.8, 0.4)),
+        lineWidth: Math.max(0.2, mapRange(fm, 0, 100, 2.5, 0.8)),
         opacity: Math.max(0, Math.min(1, opacity)),
         rotation: randomRange(0, Math.PI * 2),
-        branchAngle: mapRange(hh + mm / 60, 0, 24, Math.PI / 10, Math.PI / 3)
+        branchAngle: mapRange(hh + mm / 60, 0, 24, Math.PI / 8, Math.PI / 3.5)
       };
     });
   }
 
   render(ctx, width, height) {
-    // Pure obsidian background (Neutral)
-    ctx.fillStyle = '#010102';
-    ctx.fillRect(0, 0, width, height);
+    this._drawBackground(ctx, width, height);
 
-    // Render multi-colored fractals
+    // Render Material fractals
     this.mandalaNodes.forEach((node) => {
         if (node.opacity <= 0.01) return;
         ctx.save();
@@ -77,23 +96,28 @@ export class FractalGeometryStyle extends Style {
         for (let i = 0; i < node.spokes; i++) {
             ctx.save();
             ctx.rotate(i * node.angleStep);
-            this._drawRecursiveBranch(ctx, 0, 0, 380 * node.scale, -Math.PI / 2, node.depth, node);
+            this._drawRecursiveBranch(ctx, 0, 0, 320 * node.scale, -Math.PI / 2, node.depth, node);
             ctx.restore();
         }
         ctx.restore();
     });
 
-    // Multi-colored Ambient Dust
-    ctx.globalCompositeOperation = 'lighter';
-    for(let i=0; i<300; i++) {
-        const x = Math.random() * width;
-        const y = Math.random() * height;
-        const s = Math.random() * 1.5;
-        const h = Math.random() * 360;
-        ctx.fillStyle = `hsla(${h}, 100%, 70%, 0.15)`;
-        ctx.fillRect(x, y, s, s);
+    canvasUtils.drawGrain(ctx, width, height);
+  }
+
+  _drawBackground(ctx, width, height) {
+    const bg = this.palette[3]; // Neutral
+    if (!this.isLightMode) {
+      ctx.fillStyle = '#000000'; // AMOLED
+      ctx.fillRect(0, 0, width, height);
+      return;
     }
-    ctx.globalCompositeOperation = 'source-over';
+
+    const grad = ctx.createLinearGradient(0, 0, 0, height);
+    grad.addColorStop(0, `hsl(${bg.h}, ${bg.s}%, ${bg.l}%)`);
+    grad.addColorStop(1, `hsl(${bg.h}, ${bg.s}%, ${bg.l - 4}%)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
   }
 
   _drawRecursiveBranch(ctx, x, y, length, angle, depth, config) {
@@ -104,41 +128,40 @@ export class FractalGeometryStyle extends Style {
     
     if (isNaN(x2) || isNaN(y2)) return;
 
-    const cpX = x + Math.cos(angle + 0.1) * (length * 0.5);
-    const cpY = y + Math.sin(angle + 0.1) * (length * 0.5);
+    const cpX = x + Math.cos(angle + 0.05) * (length * 0.5);
+    const cpY = y + Math.sin(angle + 0.05) * (length * 0.5);
 
-    // AGGRESSIVE COLOR SHIFT: 140 degrees per level for high-contrast pairs
-    const branchHue = (config.baseHue + (depth * 140)) % 360;
-    const color = `hsl(${branchHue}, 100%, 65%)`;
+    // Use harmonized Material shifts for branches
+    const branchL = this.isLightMode ? Math.max(10, config.color.l - (depth * 5)) : Math.min(95, config.color.l + (depth * 5));
+    const strokeColor = `hsl(${config.color.h}, ${config.color.s}%, ${branchL}%)`;
 
     ctx.lineCap = 'round';
     
-    // 1. Vibrant Glow
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = color;
-    ctx.strokeStyle = `hsla(${branchHue}, 100%, 50%, 0.15)`;
-    ctx.lineWidth = config.lineWidth * depth * 2.8;
+    // 1. Shadow/Depth (Optimized)
+    ctx.save();
+    ctx.shadowColor = this.isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = depth * 4;
+    ctx.shadowOffsetY = 2;
+
+    // 2. Main Branch Line
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = config.lineWidth * depth * 1.5;
+    this._path(ctx, x, y, cpX, cpY, x2, y2);
+    ctx.restore();
+
+    // 3. Highlight/Edge detail (Material crispness)
+    ctx.strokeStyle = `hsla(${config.color.h}, 100%, ${this.isLightMode ? 98 : 30}%, 0.2)`;
+    ctx.lineWidth = config.lineWidth * 0.5;
     this._path(ctx, x, y, cpX, cpY, x2, y2);
 
-    // 2. High-intensity Core
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = config.lineWidth * 0.6;
-    this._path(ctx, x, y, cpX, cpY, x2, y2);
-    
-    // 3. True Neon Line
-    ctx.strokeStyle = `hsla(${branchHue}, 100%, 75%, 0.8)`;
-    ctx.lineWidth = config.lineWidth * 0.4;
-    this._path(ctx, x, y, cpX, cpY, x2, y2);
-
-    const nextLength = length * 0.73;
+    const nextLength = length * 0.7;
     this._drawRecursiveBranch(ctx, x2, y2, nextLength, angle - config.branchAngle, depth - 1, config);
     this._drawRecursiveBranch(ctx, x2, y2, nextLength, angle + config.branchAngle, depth - 1, config);
 
     if (depth === 1) {
-        ctx.fillStyle = `hsl(${branchHue}, 100%, 85%)`;
+        ctx.fillStyle = colorUtils.getAdaptiveContrast(config.color.h, config.color.s, branchL);
         ctx.beginPath();
-        ctx.arc(x2, y2, 2.5, 0, Math.PI * 2);
+        ctx.arc(x2, y2, config.lineWidth * 2, 0, Math.PI * 2);
         ctx.fill();
     }
   }
