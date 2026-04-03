@@ -56,14 +56,22 @@ if [ -f "$FILE_PATH" ]; then
     /data/data/com.termux/files/usr/bin/termux-wallpaper -f "$FILE_PATH"
     /data/data/com.termux/files/usr/bin/termux-wallpaper -f "$FILE_PATH" -l
     
-    # Small delay to ensure the OS registers the change
-    sleep 1
+    # Increased delay to ensure the OS registers the change and Monet/Material You can re-scan
+    echo "Waiting 3 seconds for system to process wallpaper change..."
+    sleep 3
 
-    # Second pass: Set Home and Lock screen again to force Monet refresh
-    /data/data/com.termux/files/usr/bin/termux-wallpaper -f "$FILE_PATH"
-    /data/data/com.termux/files/usr/bin/termux-wallpaper -f "$FILE_PATH" -l
+    # Second pass: Use a temporary copy to force the OS to see a "new" file
+    # This is a more reliable way to nudge Monet/Material You to re-calculate colors
+    TMP_FILE="${FILE_PATH}.monet.png"
+    cp "$FILE_PATH" "$TMP_FILE"
     
-    echo "$(date): Wallpaper ($STYLE) applied twice to both screens for Monet refresh: $FILE_PATH" >> "$PROJECT_DIR/wallpaper_bot.log"
+    /data/data/com.termux/files/usr/bin/termux-wallpaper -f "$TMP_FILE"
+    /data/data/com.termux/files/usr/bin/termux-wallpaper -f "$TMP_FILE" -l
+    
+    # Clean up the temporary file
+    rm "$TMP_FILE"
+    
+    echo "$(date): Wallpaper ($STYLE) applied with Monet nudge (3s delay + temp file): $FILE_PATH" >> "$PROJECT_DIR/wallpaper_bot.log"
 else
     echo "$(date): Failed to generate or find wallpaper ($STYLE)." >> "$PROJECT_DIR/wallpaper_bot.log"
     echo "Error output: $OUT" >> "$PROJECT_DIR/wallpaper_bot.log"

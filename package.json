@@ -7,8 +7,10 @@
   "author": "",
   "main": "gen1.js",
   "dependencies": {
+    "@koa/router": "^15.4.0",
     "@napi-rs/canvas": "^0.1.97",
     "koa": "^3.1.2",
+    "koa-mount": "^4.2.0",
     "koa-static": "^5.0.0"
   },
   "scripts": {

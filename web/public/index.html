@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WallGen Live</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Top Bar -->
+        <header class="app-bar">
+            <button id="menu-btn" class="icon-btn">
+                <span class="material-icons">menu</span>
+            </button>
+            <h1 class="title">WallGen Live</h1>
+            <div class="tabs">
+                <button id="tab-live" class="tab-btn active">Live</button>
+                <button id="tab-gallery" class="tab-btn">Gallery</button>
+            </div>
+            <button id="settings-btn" class="icon-btn">
+                <span class="material-icons">settings</span>
+            </button>
+        </header>
+
+        <!-- Left Sidebar: Styles -->
+        <aside id="left-sidebar" class="sidebar left">
+            <div class="sidebar-header">
+                <h2>Styles</h2>
+            </div>
+            <nav id="style-list" class="nav-list">
+                <!-- Styles will be injected here -->
+            </nav>
+        </aside>
+
+        <!-- Right Sidebar: Parameters -->
+        <aside id="right-sidebar" class="sidebar right">
+            <div class="sidebar-header">
+                <h2>Parameters</h2>
+            </div>
+            <div id="params-container" class="params-list">
+                <!-- Parameters will be injected here -->
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <section id="live-view" class="view-content active">
+                <canvas id="wallpaper-canvas"></canvas>
+            </section>
+            <section id="gallery-view" class="view-content">
+                <div class="gallery-grid" id="gallery-grid">
+                    <!-- Wallpapers will be injected here -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Overlay for closing sidebars -->
+        <div id="overlay" class="overlay"></div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
