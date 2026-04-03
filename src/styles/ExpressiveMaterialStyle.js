@@ -2,11 +2,12 @@ import { Style } from '../core/Style.js';
 import { mapRange, randomRange } from '../utils/math.js';
 import * as canvasUtils from '../utils/canvas.js';
 import * as colorUtils from '../utils/color.js';
-import { Path2D } from '@napi-rs/canvas';
+import { Path2D, createCanvas } from '@napi-rs/canvas';
 
 /**
  * ExpressiveMaterialStyle: A Material 3 inspired style featuring organic, 
  * fluid shapes, vibrant dynamic palettes, and layered depth.
+ * Enhanced with time-driven post-processing: S-curve and directional motion blur.
  */
 export class ExpressiveMaterialStyle extends Style {
   constructor(config = {}) {
@@ -14,6 +15,7 @@ export class ExpressiveMaterialStyle extends Style {
     this.blobs = [];
     this.palette = [];
     this.patternPaths = new Map();
+    this.timeData = { hh: 12, mm: 0 };
   }
 
   async init(data) {
@@ -21,6 +23,7 @@ export class ExpressiveMaterialStyle extends Style {
     if (!data || data.length === 0) return;
 
     const latest = data[data.length - 1];
+    this.timeData = { hh: latest.hh, mm: latest.mm };
     this._initPalette(latest);
     this._generateBlobs(data);
   }
@@ -77,7 +80,6 @@ export class ExpressiveMaterialStyle extends Style {
       ? randomRange(this.width * 0.3, this.width * 0.6)
       : randomRange(this.width * 0.05, this.width * 0.25);
       
-    // Increased wiggle: higher deformation and noise variation
     const deformation = mapRange(log.bp, 0, 100, 0.55, 1.3) * randomRange(0.9, 1.15);
     const numPoints = isHero ? 14 : 10; 
     const points = Array.from({ length: numPoints }, (_, j) => {
@@ -97,18 +99,15 @@ export class ExpressiveMaterialStyle extends Style {
       l: Math.min(100, Math.max(0, baseColor.l + randomRange(-10, 10)))
     };
 
-    // Pattern Configuration
     const patterns = ['dots', 'pills', 'stripes', 'grid', 'plus', 'star', 'circle', 'crescent'];
     const patternType = patterns[Math.floor(Math.random() * patterns.length)];
     const gridRotation = Math.random() * Math.PI * 2;
     const isHex = Math.random() > 0.5;
     
-    // Vary density based on ping (latency) and free memory (fm)
     const densityFactor = mapRange(log.fm, 0, 100, 1.8, 0.6) * randomRange(0.8, 1.2);
     const baseSpacing = randomRange(25, 75) / densityFactor;
     const basePatternSize = mapRange(baseSpacing, 15, 120, 2, 14);
 
-    // Border Configuration
     const hasThickBorder = Math.random() > 0.6;
     const borderLayers = hasThickBorder ? (Math.random() > 0.5 ? 2 : 1) : 0;
 
@@ -134,7 +133,6 @@ export class ExpressiveMaterialStyle extends Style {
   }
 
   async process() {
-    // Reduced steps since this is mostly for positioning
     const steps = 10;
     for (let s = 0; s < steps; s++) {
       this.blobs.forEach((blob, i) => {
@@ -147,17 +145,72 @@ export class ExpressiveMaterialStyle extends Style {
   }
 
   render(ctx, width, height) {
-    this._drawBackground(ctx, width, height);
+    // 1. Create offscreen canvas for the "semi-final draft"
+    const offscreen = createCanvas(width, height);
+    const octx = offscreen.getContext('2d');
+
+    // 2. Draw the draft logic to offscreen
+    this._drawBackground(octx, width, height);
     
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 0.8;
+    octx.globalCompositeOperation = 'source-over';
+    octx.globalAlpha = 0.8;
 
-    // Draw blobs: hero first, then expressive
     this.blobs.sort((a, b) => (a.type === 'hero' ? -1 : 1));
-    this.blobs.forEach(blob => this._drawBlob(ctx, blob));
+    this.blobs.forEach(blob => this._drawBlob(octx, blob));
 
-    ctx.globalAlpha = 1.0;
-    canvasUtils.drawGrain(ctx, width, height, 600); // Slightly reduced grain density
+    octx.globalAlpha = 1.0;
+    canvasUtils.drawGrain(octx, width, height, 600);
+
+    // 3. Draw the draft to the main canvas
+    ctx.drawImage(offscreen, 0, 0);
+
+    // 4. Create a second offscreen for effects (S-curve + Blur)
+    const fxCanvas = createCanvas(width, height);
+    const fxCtx = fxCanvas.getContext('2d');
+    
+    // Copy the draft
+    fxCtx.drawImage(offscreen, 0, 0);
+
+    // 4a. Apply S-Curve (using pixel manipulation)
+    const imageData = fxCtx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    const curve = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = i / 255;
+      // S-curve: 3x^2 - 2x^3
+      const s = x * x * (3 - 2 * x);
+      curve[i] = s * 255;
+    }
+
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = curve[data[i]];     // R
+      data[i+1] = curve[data[i+1]]; // G
+      data[i+2] = curve[data[i+2]]; // B
+    }
+    fxCtx.putImageData(imageData, 0, 0);
+
+    // 4b. Apply Linear Motion Blur
+    const hour12 = this.timeData.hh % 12;
+    const angle = (hour12 / 12) * Math.PI * 2 - Math.PI / 2;
+    const blurAmount = mapRange(this.timeData.mm, 0, 59, 1, 150);
+    
+    const blurCanvas = createCanvas(width, height);
+    const bctx = blurCanvas.getContext('2d');
+    const passes = Math.max(16, Math.floor(blurAmount / 2)); 
+    bctx.globalAlpha = 1 / passes;
+    const dx = Math.cos(angle) * blurAmount / passes;
+    const dy = Math.sin(angle) * blurAmount / passes;
+
+    for (let i = 0; i < passes; i++) {
+        bctx.drawImage(fxCanvas, i * dx, i * dy);
+    }
+
+    // 5. Composite the effect back onto the main canvas
+    ctx.save();
+    ctx.globalCompositeOperation = this.isLightMode ? 'multiply' : 'color-burn';
+    ctx.globalAlpha = 0.6; // Subtle overlay
+    ctx.drawImage(blurCanvas, 0, 0);
+    ctx.restore();
   }
 
   _drawBackground(ctx, width, height) {
@@ -180,11 +233,9 @@ export class ExpressiveMaterialStyle extends Style {
     ctx.translate(blob.x, blob.y);
     ctx.rotate(blob.rotation);
     
-    // Bold solid colors with semi-transparency for overlapping
     const alpha = blob.type === 'hero' ? 0.9 : 0.8;
     ctx.fillStyle = `hsla(${blob.color.h}, ${blob.color.s}%, ${blob.color.l}%, ${alpha})`;
     
-    // Shadow pass (only for hero blobs to save performance)
     if (blob.type === 'hero') {
       ctx.save();
       ctx.shadowColor = this.isLightMode ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.3)';
@@ -195,13 +246,11 @@ export class ExpressiveMaterialStyle extends Style {
       ctx.fill(blob.path);
     }
 
-    // Pattern Layer 
     ctx.save();
     ctx.clip(blob.path); 
     this._drawPattern(ctx, blob);
     ctx.restore();
 
-    // Multi-layered Thick Border
     if (blob.border.hasThick) {
       const { layers, baseWidth } = blob.border;
       const baseAlpha = this.isLightMode ? 0.2 : 0.15;
@@ -245,7 +294,6 @@ export class ExpressiveMaterialStyle extends Style {
     for (let y = -bounds; y < bounds; y += vSpacing) {
       const xOffset = (isHex && row % 2 === 0) ? spacing * 0.5 : 0;
       for (let x = -bounds; x < bounds; x += spacing) {
-        // Faster pseudo-random for skipping
         const stableSkip = ((Math.abs(x * 123.45 + y * 678.9 + noiseSeed)) % 100) / 100;
         if (stableSkip > skipThreshold) continue; 
 
@@ -306,12 +354,6 @@ export class ExpressiveMaterialStyle extends Style {
       case 'crescent': {
         const radius = size;
         p.arc(0, 0, radius, 0, Math.PI * 2);
-        const cutPath = new Path2D();
-        cutPath.arc(radius * 0.6, -radius * 0.3, radius, 0, Math.PI * 2, true);
-        // Note: Crescent with Path2D might need more care if we want a single path.
-        // Actually arc(..., true) makes it counter-clockwise, which "cuts" if filled with even-odd or just overlapping.
-        // But Path2D.arc doesn't "cut" unless we use it correctly. 
-        // For simplicity, I'll use a slightly different approach for crescent if needed.
         p.arc(radius * 0.6, -radius * 0.3, radius, 0, Math.PI * 2, true);
         break;
       }
