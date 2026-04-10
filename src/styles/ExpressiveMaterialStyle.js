@@ -164,19 +164,34 @@ export class ExpressiveMaterialStyle extends Style {
     // 3. Draw the draft to the main canvas
     ctx.drawImage(offscreen, 0, 0);
 
-    // 4. Create a second offscreen for effects (S-curve + Blur)
-    const fxCanvas = createCanvas(width, height);
-    const fxCtx = fxCanvas.getContext('2d');
+    // 4. Create a second offscreen for effects (Blur + S-curve)
+    const blurCanvas = createCanvas(width, height);
+    const bctx = blurCanvas.getContext('2d');
     
-    // Copy the draft
-    fxCtx.drawImage(offscreen, 0, 0);
+    // 4a. Apply Linear Motion Blur first (on the draft)
+    const hour12 = this.timeData.hh % 12;
+    const angle = (hour12 / 12) * Math.PI * 2 - Math.PI / 2;
+    const blurAmount = mapRange(this.timeData.mm, 0, 59, 1, 150);
+    
+    const passes = Math.max(16, Math.floor(blurAmount / 2)); 
+    bctx.globalAlpha = 1 / passes;
+    const dx = Math.cos(angle) * blurAmount / passes;
+    const dy = Math.sin(angle) * blurAmount / passes;
 
-    // 4a. Apply S-Curve (using pixel manipulation)
-    const imageData = fxCtx.getImageData(0, 0, width, height);
+    for (let i = 0; i < passes; i++) {
+        bctx.drawImage(offscreen, i * dx, i * dy);
+    }
+
+    // 4b. Apply aggressive S-Curve (contrast) to the blurred result
+    const imageData = bctx.getImageData(0, 0, width, height);
     const data = imageData.data;
     const curve = new Uint8Array(256);
+    const contrastBoost = 1.3; // Extra contrast factor
     for (let i = 0; i < 256; i++) {
-      const x = i / 255;
+      let x = i / 255;
+      // Center around 0.5 and boost
+      x = (x - 0.5) * contrastBoost + 0.5;
+      x = Math.max(0, Math.min(1, x));
       // S-curve: 3x^2 - 2x^3
       const s = x * x * (3 - 2 * x);
       curve[i] = s * 255;
@@ -187,28 +202,12 @@ export class ExpressiveMaterialStyle extends Style {
       data[i+1] = curve[data[i+1]]; // G
       data[i+2] = curve[data[i+2]]; // B
     }
-    fxCtx.putImageData(imageData, 0, 0);
-
-    // 4b. Apply Linear Motion Blur
-    const hour12 = this.timeData.hh % 12;
-    const angle = (hour12 / 12) * Math.PI * 2 - Math.PI / 2;
-    const blurAmount = mapRange(this.timeData.mm, 0, 59, 1, 150);
-    
-    const blurCanvas = createCanvas(width, height);
-    const bctx = blurCanvas.getContext('2d');
-    const passes = Math.max(16, Math.floor(blurAmount / 2)); 
-    bctx.globalAlpha = 1 / passes;
-    const dx = Math.cos(angle) * blurAmount / passes;
-    const dy = Math.sin(angle) * blurAmount / passes;
-
-    for (let i = 0; i < passes; i++) {
-        bctx.drawImage(fxCanvas, i * dx, i * dy);
-    }
+    bctx.putImageData(imageData, 0, 0);
 
     // 5. Composite the effect back onto the main canvas
     ctx.save();
-    ctx.globalCompositeOperation = this.isLightMode ? 'multiply' : 'color-burn';
-    ctx.globalAlpha = 0.6; // Subtle overlay
+    ctx.globalCompositeOperation = 'color-burn';
+    ctx.globalAlpha = 0.85; // Increased alpha for more definition
     ctx.drawImage(blurCanvas, 0, 0);
     ctx.restore();
   }
