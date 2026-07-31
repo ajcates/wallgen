@@ -2,65 +2,324 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WallGen Live</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="css/main.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WallGen Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --surface: #1a1a1e;
+            --primary: #d0bcff;
+            --text: #e1e2e5;
+            --text-dim: #909094;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .header {
+            padding: 24px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: rgba(10, 10, 12, 0.8);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .header h1 span {
+            color: var(--primary);
+        }
+
+        .btn-refresh-all {
+            background: var(--surface);
+            border: none;
+            color: var(--text);
+            padding: 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            padding: 0 16px 40px;
+        }
+
+        @media (min-width: 768px) {
+            .gallery {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .gallery {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 24px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .card:active {
+            transform: scale(0.96);
+        }
+
+        .card-img-wrap {
+            aspect-ratio: 9/16;
+            width: 100%;
+            background: #222;
+            position: relative;
+        }
+
+        .card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .card img.loaded {
+            opacity: 1;
+        }
+
+        .card-info {
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-name {
+            font-weight: 500;
+            font-size: 15px;
+            text-transform: capitalize;
+        }
+
+        .card-action {
+            color: var(--primary);
+            font-size: 18px;
+        }
+
+        .skeleton {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, #1a1a1e 25%, #2a2a2e 50%, #1a1a1e 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Modal Preview */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-img {
+            flex-grow: 1;
+            object-fit: contain;
+            width: 100%;
+        }
+
+        .modal-controls {
+            padding: 30px;
+            display: flex;
+            justify-content: space-around;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+
+        .circle-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border: none;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .circle-btn.primary {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .loader-dots {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .active .loader-dots { display: block; }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <!-- Top Bar -->
-        <header class="app-bar">
-            <button id="menu-btn" class="icon-btn">
-                <span class="material-icons">menu</span>
-            </button>
-            <h1 class="title">WallGen Live</h1>
-            <div class="tabs">
-                <button id="tab-live" class="tab-btn active">Live</button>
-                <button id="tab-gallery" class="tab-btn">Gallery</button>
-            </div>
-            <button id="settings-btn" class="icon-btn">
-                <span class="material-icons">settings</span>
-            </button>
-        </header>
 
-        <!-- Left Sidebar: Styles -->
-        <aside id="left-sidebar" class="sidebar left">
-            <div class="sidebar-header">
-                <h2>Styles</h2>
-            </div>
-            <nav id="style-list" class="nav-list">
-                <!-- Styles will be injected here -->
-            </nav>
-        </aside>
+    <header class="header">
+        <h1>Wall<span>Gen</span> Studio</h1>
+        <button class="btn-refresh-all" onclick="refreshAll()" title="Prerender all styles">
+            <span class="material-icons-round">refresh</span>
+        </button>
+    </header>
 
-        <!-- Right Sidebar: Parameters -->
-        <aside id="right-sidebar" class="sidebar right">
-            <div class="sidebar-header">
-                <h2>Parameters</h2>
-            </div>
-            <div id="params-container" class="params-list">
-                <!-- Parameters will be injected here -->
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <section id="live-view" class="view-content active">
-                <canvas id="wallpaper-canvas"></canvas>
-            </section>
-            <section id="gallery-view" class="view-content">
-                <div class="gallery-grid" id="gallery-grid">
-                    <!-- Wallpapers will be injected here -->
-                </div>
-            </section>
-        </main>
-
-        <!-- Overlay for closing sidebars -->
-        <div id="overlay" class="overlay"></div>
+    <div class="gallery" id="gallery">
+        <!-- Cards will be injected here -->
     </div>
 
-    <script type="module" src="js/app.js"></script>
+    <!-- Fullscreen Modal -->
+    <div class="modal" id="modal">
+        <img src="" alt="" class="modal-img" id="modal-img">
+        <div class="modal-controls">
+            <button class="circle-btn" onclick="closeModal()">
+                <span class="material-icons-round">close</span>
+            </button>
+            <button class="circle-btn primary" id="btn-regen">
+                <span class="material-icons-round">autorenew</span>
+            </button>
+            <button class="circle-btn" id="btn-download">
+                <span class="material-icons-round">download</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const gallery = document.getElementById('gallery');
+        const modal = document.getElementById('modal');
+        const modalImg = document.getElementById('modal-img');
+        const btnRegen = document.getElementById('btn-regen');
+        const btnDownload = document.getElementById('btn-download');
+
+        let currentStyle = '';
+
+        async function loadGallery() {
+            const res = await fetch('/api/styles');
+            const styles = await res.json();
+            
+            gallery.innerHTML = '';
+            styles.forEach(style => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => openModal(style);
+                card.innerHTML = `
+                    <div class="card-img-wrap">
+                        <div class="skeleton" id="skeleton-${style}"></div>
+                        <img src="/api/render/${style}" id="img-${style}" onload="onImgLoad('${style}')">
+                    </div>
+                    <div class="card-info">
+                        <span class="card-name">${style}</span>
+                        <span class="material-icons-round card-action">chevron_right</span>
+                    </div>
+                `;
+                gallery.appendChild(card);
+            });
+        }
+
+        function onImgLoad(style) {
+            document.getElementById(`skeleton-${style}`).style.display = 'none';
+            document.getElementById(`img-${style}`).classList.add('loaded');
+        }
+
+        function openModal(style) {
+            currentStyle = style;
+            modalImg.src = `/api/render/${style}`;
+            modal.classList.add('active');
+            
+            btnRegen.onclick = async () => {
+                modalImg.style.opacity = '0.3';
+                const ts = Date.now();
+                modalImg.src = `/api/render/${style}?force=true&t=${ts}`;
+                modalImg.onload = () => {
+                    modalImg.style.opacity = '1';
+                    // Update the card image too
+                    document.getElementById(`img-${style}`).src = `/api/render/${style}?t=${ts}`;
+                };
+            };
+
+            btnDownload.onclick = () => {
+                const link = document.createElement('a');
+                link.href = `/api/render/${style}`;
+                link.download = `wallgen_${style}.png`;
+                link.click();
+            };
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+        }
+
+        function refreshAll() {
+            if(confirm('This will rerender all styles. Continue?')) {
+                const imgs = document.querySelectorAll('.card img');
+                imgs.forEach(img => {
+                    const style = img.id.replace('img-', '');
+                    document.getElementById(`skeleton-${style}`).style.display = 'block';
+                    img.classList.remove('loaded');
+                    img.src = `/api/render/${style}?force=true&t=${Date.now()}`;
+                });
+            }
+        }
+
+        // Handle Back button for modal
+        window.onpopstate = () => closeModal();
+
+        loadGallery();
+    </script>
 </body>
 </html>

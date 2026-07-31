@@ -31,6 +31,14 @@ echo "9) helix  (DNA-like double helix structures)"
 echo "10) circuit (Cyber circuit board hardware)"
 echo "11) energy (Twisting 3D vortex energy flows)"
 echo "12) synapse (High-tech neural data web)"
+echo "13) liquidsteel (Swirling liquid metal)"
+echo "14) trill (Postmodern abstract arrangements)"
+echo "15) mandala (2.5D radial patterns)"
+echo "16) trap (Postmodern crystalline smoke)"
+echo "17) smoke2 (Experimental Crystal Smoke)"
+echo "18) oil    (Fluid iridescent oil-on-water)"
+echo "19) beveled (Beveled, embossed 3D circuit board lines)"
+echo "20) plasmo (Smooth stirred lava blobs on AMOLED black)"
 echo ""
 
 read -p "Select a style [Current: $STYLE]: " style_choice
@@ -48,6 +56,14 @@ case $style_choice in
     10) STYLE="circuit" ;;
     11) STYLE="energy" ;;
     12) STYLE="synapse" ;;
+    13) STYLE="liquidsteel" ;;
+    14) STYLE="trill" ;;
+    15) STYLE="mandala" ;;
+    16) STYLE="trap" ;;
+    17) STYLE="smoke2" ;;
+    18) STYLE="oil" ;;
+    19) STYLE="beveled" ;;
+    20) STYLE="plasmo" ;;
     *) 
         if [ ! -z "$style_choice" ]; then
             STYLE=$style_choice

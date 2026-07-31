@@ -7,7 +7,7 @@ import { Path2D, createCanvas } from '@napi-rs/canvas';
 /**
  * ExpressiveMaterialStyle: A Material 3 inspired style featuring organic, 
  * fluid shapes, vibrant dynamic palettes, and layered depth.
- * Enhanced with time-driven post-processing: S-curve and directional motion blur.
+ * Optimized with canvas reuse, pattern batching, and native filters.
  */
 export class ExpressiveMaterialStyle extends Style {
   constructor(config = {}) {
@@ -16,10 +16,22 @@ export class ExpressiveMaterialStyle extends Style {
     this.palette = [];
     this.patternPaths = new Map();
     this.timeData = { hh: 12, mm: 0 };
+    // Reuse canvases to avoid GC pressure
+    this.offscreen = null;
+    this.blurCanvas = null;
+    this.patternCanvas = null;
   }
 
   async init(data) {
     await super.init(data);
+    
+    // Initialize or resize reusable canvases
+    if (!this.offscreen || this.offscreen.width !== this.width || this.offscreen.height !== this.height) {
+      this.offscreen = createCanvas(this.width, this.height);
+      this.blurCanvas = createCanvas(this.width, this.height);
+      this.patternCanvas = createCanvas(256, 256); // Buffer for pattern tiles
+    }
+
     if (!data || data.length === 0) return;
 
     const latest = data[data.length - 1];
@@ -105,11 +117,11 @@ export class ExpressiveMaterialStyle extends Style {
     const isHex = Math.random() > 0.5;
     
     const densityFactor = mapRange(log.fm, 0, 100, 1.8, 0.6) * randomRange(0.8, 1.2);
-    const baseSpacing = randomRange(25, 75) / densityFactor;
-    const basePatternSize = mapRange(baseSpacing, 15, 120, 2, 14);
+    const baseSpacing = randomRange(15, 40) / densityFactor;
+    const basePatternSize = mapRange(baseSpacing, 10, 80, 2, 10);
 
     const hasThickBorder = Math.random() > 0.6;
-    const borderLayers = hasThickBorder ? (Math.random() > 0.5 ? 2 : 1) : 0;
+    const borderLayers = hasThickBorder ? 1 : 0;
 
     return { 
       x, y, points, path, maxR, color, 
@@ -133,7 +145,7 @@ export class ExpressiveMaterialStyle extends Style {
   }
 
   async process() {
-    const steps = 10;
+    const steps = 5; // Reduced steps for performance
     for (let s = 0; s < steps; s++) {
       this.blobs.forEach((blob, i) => {
         const speed = blob.type === 'hero' ? 0.002 : 0.005;
@@ -144,12 +156,10 @@ export class ExpressiveMaterialStyle extends Style {
     }
   }
 
-  render(ctx, width, height) {
-    // 1. Create offscreen canvas for the "semi-final draft"
-    const offscreen = createCanvas(width, height);
-    const octx = offscreen.getContext('2d');
+  async render(ctx, width, height) {
+    const octx = this.offscreen.getContext('2d');
+    octx.clearRect(0, 0, width, height);
 
-    // 2. Draw the draft logic to offscreen
     this._drawBackground(octx, width, height);
     
     octx.globalCompositeOperation = 'source-over';
@@ -159,56 +169,32 @@ export class ExpressiveMaterialStyle extends Style {
     this.blobs.forEach(blob => this._drawBlob(octx, blob));
 
     octx.globalAlpha = 1.0;
-    canvasUtils.drawGrain(octx, width, height, 600);
+    await canvasUtils.drawGrain(octx, width, height, 400);
 
-    // 3. Draw the draft to the main canvas
-    ctx.drawImage(offscreen, 0, 0);
-
-    // 4. Create a second offscreen for effects (Blur + S-curve)
-    const blurCanvas = createCanvas(width, height);
-    const bctx = blurCanvas.getContext('2d');
+    const bctx = this.blurCanvas.getContext('2d');
+    bctx.clearRect(0, 0, width, height);
     
-    // 4a. Apply Linear Motion Blur first (on the draft)
     const hour12 = this.timeData.hh % 12;
     const angle = (hour12 / 12) * Math.PI * 2 - Math.PI / 2;
-    const blurAmount = mapRange(this.timeData.mm, 0, 59, 1, 150);
+    const blurAmount = mapRange(this.timeData.mm, 0, 59, 1, 100);
     
-    const passes = Math.max(16, Math.floor(blurAmount / 2)); 
+    const passes = Math.min(12, Math.max(4, Math.floor(blurAmount / 8))); 
     bctx.globalAlpha = 1 / passes;
     const dx = Math.cos(angle) * blurAmount / passes;
     const dy = Math.sin(angle) * blurAmount / passes;
 
     for (let i = 0; i < passes; i++) {
-        bctx.drawImage(offscreen, i * dx, i * dy);
+        bctx.drawImage(this.offscreen, i * dx, i * dy);
     }
 
-    // 4b. Apply aggressive S-Curve (contrast) to the blurred result
-    const imageData = bctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-    const curve = new Uint8Array(256);
-    const contrastBoost = 1.3; // Extra contrast factor
-    for (let i = 0; i < 256; i++) {
-      let x = i / 255;
-      // Center around 0.5 and boost
-      x = (x - 0.5) * contrastBoost + 0.5;
-      x = Math.max(0, Math.min(1, x));
-      // S-curve: 3x^2 - 2x^3
-      const s = x * x * (3 - 2 * x);
-      curve[i] = s * 255;
-    }
+    ctx.drawImage(this.offscreen, 0, 0);
 
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = curve[data[i]];     // R
-      data[i+1] = curve[data[i+1]]; // G
-      data[i+2] = curve[data[i+2]]; // B
-    }
-    bctx.putImageData(imageData, 0, 0);
-
-    // 5. Composite the effect back onto the main canvas
     ctx.save();
+    ctx.filter = 'contrast(1.4) saturate(1.2)';
     ctx.globalCompositeOperation = 'color-burn';
-    ctx.globalAlpha = 0.85; // Increased alpha for more definition
-    ctx.drawImage(blurCanvas, 0, 0);
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(this.blurCanvas, 0, 0);
+    ctx.filter = 'none';
     ctx.restore();
   }
 
@@ -236,14 +222,11 @@ export class ExpressiveMaterialStyle extends Style {
     ctx.fillStyle = `hsla(${blob.color.h}, ${blob.color.s}%, ${blob.color.l}%, ${alpha})`;
     
     if (blob.type === 'hero') {
-      ctx.save();
-      ctx.shadowColor = this.isLightMode ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.3)';
-      ctx.shadowBlur = 20;
-      ctx.fill(blob.path);
-      ctx.restore();
-    } else {
-      ctx.fill(blob.path);
+      ctx.shadowColor = this.isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 30;
     }
+    ctx.fill(blob.path);
+    if (blob.type === 'hero') ctx.shadowBlur = 0;
 
     ctx.save();
     ctx.clip(blob.path); 
@@ -260,54 +243,60 @@ export class ExpressiveMaterialStyle extends Style {
       ctx.stroke(blob.path);
 
       if (layers >= 2) {
-        ctx.strokeStyle = `hsla(${bColor.h}, ${bColor.s}%, ${bColor.l}%, ${baseAlpha * 1.5})`;
         ctx.lineWidth = baseWidth * 0.45;
         ctx.stroke(blob.path);
       }
-    } else if (blob.type === 'expressive') {
-      ctx.strokeStyle = `hsla(${blob.color.h}, 100%, 98%, 0.1)`;
-      ctx.lineWidth = 2; 
-      ctx.stroke(blob.path);
     }
     ctx.restore();
   }
 
   _drawPattern(ctx, blob) {
-    const { type, spacing, size, rotation, isHex, densityFactor, noiseSeed } = blob.pattern;
-
+    const { type, spacing, size, rotation, isHex } = blob.pattern;
     const isDarkBlob = blob.color.l < 50;
-    const lOffset = isDarkBlob ? 12 : -12; 
-    ctx.fillStyle = `hsla(${blob.color.h}, ${blob.color.s * 0.8}%, ${Math.max(0, Math.min(100, blob.color.l + lOffset))}%, 0.6)`;
-    ctx.strokeStyle = ctx.fillStyle;
+    const lOffset = isDarkBlob ? 15 : -15; 
     
-    const bounds = blob.maxR + spacing; 
-    const vSpacing = isHex ? spacing * 0.866 : spacing; // sqrt(3)/2 approx
+    const vSpacing = isHex ? spacing * 0.866 : spacing;
     
-    ctx.save();
-    ctx.rotate(rotation); 
+    this.patternCanvas.width = spacing;
+    this.patternCanvas.height = vSpacing;
+    const pctx = this.patternCanvas.getContext('2d');
+    
+    pctx.fillStyle = `hsla(${blob.color.h}, ${blob.color.s * 0.8}%, ${Math.max(0, Math.min(100, blob.color.l + lOffset))}%, 0.5)`;
+    pctx.strokeStyle = pctx.fillStyle;
     
     const patternPath = this._getPatternPath(type, size, spacing);
-    const skipThreshold = densityFactor * 0.75;
     
-    let row = 0;
-    for (let y = -bounds; y < bounds; y += vSpacing) {
-      const xOffset = (isHex && row % 2 === 0) ? spacing * 0.5 : 0;
-      for (let x = -bounds; x < bounds; x += spacing) {
-        const stableSkip = ((Math.abs(x * 123.45 + y * 678.9 + noiseSeed)) % 100) / 100;
-        if (stableSkip > skipThreshold) continue; 
-
-        ctx.translate(x + xOffset, y);
-        if (type === 'stripes' || type === 'grid' || type === 'plus' || type === 'circle') {
-          ctx.lineWidth = Math.max(1, size / 4);
-          ctx.stroke(patternPath);
-        } else {
-          ctx.fill(patternPath);
-        }
-        ctx.translate(-(x + xOffset), -y);
-      }
-      row++;
+    pctx.save();
+    pctx.translate(spacing/2, vSpacing/2);
+    this._renderPatternUnit(pctx, type, patternPath, size);
+    if (isHex) {
+        pctx.translate(-spacing/2, -vSpacing/2);
+        pctx.translate(0, 0); // Origin unit
+        this._renderPatternUnit(pctx, type, patternPath, size);
+        pctx.translate(spacing, 0);
+        this._renderPatternUnit(pctx, type, patternPath, size);
+        pctx.translate(-spacing/2, vSpacing);
+        this._renderPatternUnit(pctx, type, patternPath, size);
     }
+    pctx.restore();
+
+    const pattern = ctx.createPattern(this.patternCanvas, 'repeat');
+    
+    ctx.save();
+    ctx.rotate(rotation);
+    ctx.fillStyle = pattern;
+    const bounds = blob.maxR * 1.5;
+    ctx.fillRect(-bounds, -bounds, bounds * 2, bounds * 2);
     ctx.restore();
+  }
+
+  _renderPatternUnit(ctx, type, path, size) {
+    if (type === 'stripes' || type === 'grid' || type === 'circle' || type === 'plus') {
+      ctx.lineWidth = Math.max(1, size / 4);
+      ctx.stroke(path);
+    } else {
+      ctx.fill(path);
+    }
   }
 
   _getPatternPath(type, size, spacing) {

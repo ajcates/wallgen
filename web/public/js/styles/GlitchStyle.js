@@ -34,24 +34,58 @@ export class GlitchStyle extends Style {
   }
 
   render(ctx, width, height) {
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, width, height);
 
     const shift = (this.config.colorShift || 10) + (this.glitchOffset || 0);
-  ...
+    const speed = this.config.animationSpeed || 1.0;
+    
+    // Digital Noise
+    if (Math.random() > 0.5) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        for(let i=0; i<100; i++) {
+            ctx.fillRect(Math.random()*width, Math.random()*height, 2, 2);
+        }
+    }
+
     this.data.forEach((log, i) => {
       const y = mapRange(log.hh % 24, 0, 24, 0, height);
       const x = mapRange(log.mm % 60, 0, 60, 0, width);
-      const h = 20 + Math.random() * 50;
+      const h = 20 + Math.random() * 50 * (this.config.noiseLevel || 0.5);
 
-      // RGB Split effect
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-      ctx.fillRect(x - shift, y, width * 0.8, h);
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-      ctx.fillRect(x + shift, y, width * 0.8, h);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      // Chromatic Aberration / RGB Split
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      
+      // Red
+      ctx.fillStyle = 'rgba(255, 0, 85, 0.6)';
+      ctx.fillRect(x - shift, y + (Math.random()-0.5)*5, width * 0.8, h);
+      
+      // Cyan
+      ctx.fillStyle = 'rgba(0, 255, 204, 0.6)';
+      ctx.fillRect(x + shift, y + (Math.random()-0.5)*5, width * 0.8, h);
+      
+      // Main
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.fillRect(x, y, width * 0.8, h);
+      
+      ctx.restore();
+
+      // Horizontal "bits"
+      if (Math.random() > 0.9) {
+          ctx.fillStyle = '#00ffcc';
+          ctx.fillRect(Math.random()*width, y, Math.random()*100, 2);
+      }
     });
+
+    // Random Color Inversion Slice
+    if (Math.random() > 0.95) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'difference';
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, Math.random()*height, width, Math.random()*100);
+        ctx.restore();
+    }
 
     // Scanlines
     const scanlineInt = this.config.scanlines || 0.1;

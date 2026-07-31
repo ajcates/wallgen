@@ -121,7 +121,7 @@ export class CyberCircuitStyle extends Style {
     return { x, y, w, h, type, color, rotation: (Math.random() > 0.5 ? 0 : Math.PI / 2) };
   }
 
-  render(ctx, width, height) {
+  async render(ctx, width, height) {
     this._drawPCB(ctx, width, height);
 
     // Draw Background Traces
@@ -133,7 +133,7 @@ export class CyberCircuitStyle extends Style {
     // Draw Components with depth
     this.layers.components.forEach(comp => this._drawComponent(ctx, comp));
 
-    canvasUtils.drawGrain(ctx, width, height, 1200, 0.05);
+    await canvasUtils.drawGrain(ctx, width, height, 1200, 0.05);
   }
 
   _drawPCB(ctx, width, height) {

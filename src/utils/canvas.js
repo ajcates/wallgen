@@ -43,8 +43,7 @@ export function drawPill(ctx, x, y, width, height, rotation) {
  */
 export function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
   let rot = Math.PI / 2 * 3;
-  let x = cx;
-  let y = cy;
+  let x, y;
   let step = Math.PI / spikes;
 
   ctx.beginPath();
@@ -80,18 +79,32 @@ export function drawCrescent(ctx, x, y, radius) {
   ctx.restore();
 }
 
+let noiseTile = null;
+
 /**
- * Applies a grainy texture over the canvas.
+ * Applies a grainy texture over the canvas using a pre-rendered noise tile for speed.
  */
-export function drawGrain(ctx, width, height, density = 800, alpha = 0.04) {
+export async function drawGrain(ctx, width, height, density = 400, alpha = 0.05) {
+  if (!noiseTile) {
+    const { createCanvas } = await import('@napi-rs/canvas');
+
+    noiseTile = createCanvas(128, 128);
+    const nctx = noiseTile.getContext('2d');
+    nctx.globalAlpha = 0.5;
+    const dotCount = (density / 400) * 2000;
+    for (let i = 0; i < dotCount; i++) {
+      const x = Math.random() * 128;
+      const y = Math.random() * 128;
+      nctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#000000';
+      nctx.fillRect(x, y, 1, 1);
+    }
+  }
+
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.globalCompositeOperation = 'overlay';
-  for (let i = 0; i < density; i++) {
-    const x = Math.random() * width;
-    const y = Math.random() * height;
-    ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#000000';
-    ctx.fillRect(x, y, 1.5, 1.5);
-  }
+  const pattern = ctx.createPattern(noiseTile, 'repeat');
+  ctx.fillStyle = pattern;
+  ctx.fillRect(0, 0, width, height);
   ctx.restore();
 }

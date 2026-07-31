@@ -70,7 +70,7 @@ export class Style {
    * @param {number} width
    * @param {number} height
    */
-  render(ctx, width, height) {
+  async render(_ctx, _width, _height) {
     // To be implemented by subclasses
   }
 }

@@ -71,7 +71,7 @@ export class DoubleHelixFractalStyle extends Style {
     });
   }
 
-  render(ctx, width, height) {
+  async render(ctx, width, height) {
     this._drawBackground(ctx, width, height);
     this._drawAmbientParticles(ctx, width, height);
 
@@ -101,7 +101,7 @@ export class DoubleHelixFractalStyle extends Style {
       ctx.restore();
     });
 
-    canvasUtils.drawGrain(ctx, width, height);
+    await canvasUtils.drawGrain(ctx, width, height);
   }
 
   _drawAmbientParticles(ctx, width, height) {

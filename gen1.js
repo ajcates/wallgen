@@ -19,20 +19,19 @@ const parseLine = line => {
     /TIME=(\d+)\.(\d+).*BP=(\d+).*FM=(\d+).*UP=(\d+).*PT=(\d+)/
   );
   if (!match) return null;
-  const [_, hh, mm, bp, fm, up, pt] = match.map(Number);
+  const [, hh, mm, bp, fm, up, pt] = match.map(Number);
   return { hh, mm, bp, fm, up, pt };
 };
 
 // Create a flowing curve for each log entry
-const curveFromLog = ({ hh, mm, bp, fm, up, pt }, lastPoint = null, steps = 50) => {
-  const startX = mapRange(mm, 0, 59, 0, WIDTH);
+const curveFromLog = ({ hh, mm, bp, fm, up, pt }, _lastPoint = null, steps = 50) => {
+  const _startX = mapRange(mm, 0, 59, 0, WIDTH);
   const startY = mapRange(hh, 0, 23, 0, HEIGHT);
   const wiggleFreq = mapRange(pt, 0, 1000, 0.05, 0.3);
   const waveHeight = mapRange(fm, 0, 100, 2, 20);
   const lineWidth = mapRange(bp, 0, 100, 1, 6);
   const colorHue = mapRange(up, 0, 86400, 200, 360);
 
-  const start = lastPoint ?? { x: startX, y: startY };
   const points = Array.from({ length: steps }, (_, i) => {
     const t = i / steps;
     const x = mapRange(mm + t, 0, 59, 0, WIDTH);
@@ -97,8 +96,30 @@ const getNextFilename = async dir => {
 
 // Main wallpaper generation
 const generateWallpaper = async () => {
-  const logContent = await fs.readFile(LOG_PATH, 'utf-8');
-  const lines = logContent.split('\n').map(parseLine).filter(Boolean);
+  let lines;
+  try {
+    const logContent = await fs.readFile(LOG_PATH, 'utf-8');
+    lines = logContent.split('\n').map(parseLine).filter(Boolean);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.log(`[INFO] No log found at ${LOG_PATH}. Using synthetic data.`);
+      lines = Array.from({ length: 50 }, (_, i) => ({
+        hh: Math.floor((i / 50) * 24) % 24,
+        mm: (i * 7) % 60,
+        bp: 100 - i,
+        fm: 40 + i,
+        up: i * 3600,
+        pt: 20 + Math.floor(Math.random() * 200)
+      }));
+    } else {
+      throw err;
+    }
+  }
+
+  if (lines.length === 0) {
+    console.error('No data to render.');
+    return;
+  }
 
   let lastPoint = null;
   const curves = lines.map(log => {

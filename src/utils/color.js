@@ -11,11 +11,30 @@ import { randomRange } from './math.js';
  * @param {boolean} isLightMode - Whether to generate light or dark tones
  */
 export function generateMaterialPalette(baseHue, saturation, isLightMode) {
+  const schemeType = Math.floor(Math.random() * 3);
+  let secH, terH;
+
+  if (schemeType === 0) { // Analogous
+    secH = baseHue + 35;
+    terH = baseHue - 35 + 360;
+  } else if (schemeType === 1) { // Split-Complementary
+    secH = baseHue + 150;
+    terH = baseHue + 210;
+  } else { // Triadic
+    secH = baseHue + 120;
+    terH = baseHue + 240;
+  }
+
+  // Add small random noise for variety
+  secH = (secH + randomRange(-10, 10)) % 360;
+  terH = (terH + randomRange(-10, 10)) % 360;
+  const s = Math.max(80, saturation); // Keep it highly saturated/vibrant
+
   return [
-    { h: (baseHue + randomRange(-15, 15)) % 360, s: saturation, l: isLightMode ? 45 : 65, name: 'primary' },
-    { h: (baseHue + randomRange(30, 70)) % 360, s: saturation - 10, l: isLightMode ? 55 : 55, name: 'secondary' },
-    { h: (baseHue + randomRange(160, 220)) % 360, s: saturation, l: isLightMode ? 40 : 70, name: 'tertiary' },
-    { h: 0, s: 0, l: isLightMode ? 98 : 0, name: 'neutral' } 
+    { h: baseHue, s: s, l: isLightMode ? 50 : 65, name: 'primary' },
+    { h: secH, s: s - 5, l: isLightMode ? 60 : 75, name: 'secondary' },
+    { h: terH, s: s, l: isLightMode ? 45 : 70, name: 'tertiary' },
+    { h: baseHue, s: 15, l: isLightMode ? 96 : 8, name: 'neutral' } 
   ];
 }
 

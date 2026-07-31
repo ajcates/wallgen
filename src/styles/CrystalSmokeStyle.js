@@ -13,6 +13,11 @@ export class CrystalSmokeStyle extends Style {
     this.shards = [];
     this.dust = [];
     this.smokePuffs = [];
+    this.smokeRibbons = [];
+    this.smokeTendrils = [];
+    this.vortexes = [];
+    this.embers = [];
+    this.lightRays = [];
   }
 
   async init(data) {
@@ -23,6 +28,7 @@ export class CrystalSmokeStyle extends Style {
     this._initLighting(data[data.length - 1]);
     this._generateShards(data);
     this._generateSmoke(data);
+    this._generateAtmosphere(data);
   }
 
   _initPalette(firstEntry) {
@@ -194,12 +200,53 @@ export class CrystalSmokeStyle extends Style {
 
   _generateSmoke(data) {
     this.smokePuffs = [];
+    this.smokeRibbons = [];
+    this.smokeTendrils = [];
+    this.embers = [];
     data.filter((_, i) => i % 2 === 0).forEach((log, i) => {
       const startX = this.wrapX(mapRange(log.mm, 0, 60, 0, this.width));
       const startY = this.wrapY(mapRange(log.hh, 0, 24, 0, this.height));
       const length = mapRange(log.up % 3600, 0, 3600, 400, 1500);
       const baseAngle = mapRange(log.pt, 0, 1000, 0, Math.PI * 2);
       const baseColor = this.palette[i % this.palette.length];
+
+      // 1. Long, coherent filaments give the smoke a readable flow direction.
+      for (let ribbon = 0; ribbon < 3; ribbon++) {
+        const side = ribbon - 1;
+        const normalX = Math.cos(baseAngle + Math.PI / 2);
+        const normalY = Math.sin(baseAngle + Math.PI / 2);
+        const ribbonLength = length * randomRange(0.55, 1.05);
+        const ribbonStartX = this.wrapX(startX + normalX * side * 58);
+        const ribbonStartY = this.wrapY(startY + normalY * side * 58);
+        const controlDistance = ribbonLength * randomRange(0.36, 0.62);
+        const bend = side * randomRange(80, 190) + Math.sin(i * 1.7 + ribbon) * 75;
+        this.smokeRibbons.push({
+          startX: ribbonStartX,
+          startY: ribbonStartY,
+          controlX: this.wrapX(ribbonStartX + Math.cos(baseAngle) * controlDistance + normalX * bend),
+          controlY: this.wrapY(ribbonStartY + Math.sin(baseAngle) * controlDistance + normalY * bend),
+          endX: this.wrapX(ribbonStartX + Math.cos(baseAngle) * ribbonLength + normalX * bend * 0.35),
+          endY: this.wrapY(ribbonStartY + Math.sin(baseAngle) * ribbonLength + normalY * bend * 0.35),
+          width: randomRange(16, 42),
+          hue: (baseColor.h + ribbon * 18) % 360,
+          alpha: randomRange(0.025, 0.055)
+        });
+
+        // Fine turbulent tendrils dissolve the hard edge of each broad ribbon.
+        for (let strand = 0; strand < 3; strand++) {
+          const strandOffset = (strand - 1) * randomRange(9, 22);
+          this.smokeTendrils.push({
+            startX: this.wrapX(ribbonStartX + normalX * strandOffset),
+            startY: this.wrapY(ribbonStartY + normalY * strandOffset),
+            controlX: this.wrapX(ribbonStartX + Math.cos(baseAngle) * controlDistance + normalX * (bend + strandOffset * 2.5)),
+            controlY: this.wrapY(ribbonStartY + Math.sin(baseAngle) * controlDistance + normalY * (bend + strandOffset * 2.5)),
+            endX: this.wrapX(ribbonStartX + Math.cos(baseAngle) * ribbonLength + normalX * (bend * 0.35 + strandOffset)),
+            endY: this.wrapY(ribbonStartY + Math.sin(baseAngle) * ribbonLength + normalY * (bend * 0.35 + strandOffset)),
+            width: randomRange(1.2, 3.5), hue: (baseColor.h + 10 + strand * 13) % 360,
+            alpha: randomRange(0.018, 0.05)
+          });
+        }
+      }
 
       const numPuffs = 50; 
       for (let j = 0; j < numPuffs; j++) {
@@ -212,13 +259,30 @@ export class CrystalSmokeStyle extends Style {
           const y = this.wrapY(startY + Math.sin(angle) * dist + Math.sin(angle + Math.PI/2) * turbulence);
 
           // Main puff with noise
+          // 2. A dense core, soft body, and sparse fringe make each plume volumetric.
+          const densityBand = t < 0.24 ? 'core' : (t < 0.7 ? 'body' : 'fringe');
+          const bandAlpha = densityBand === 'core' ? 1.35 : (densityBand === 'body' ? 1 : 0.65);
           this.smokePuffs.push({
               x: x + (Math.random() - 0.5) * 80 * t,
               y: y + (Math.random() - 0.5) * 80 * t,
               size: mapRange(t, 0, 1, 30, 300) * (0.8 + Math.random() * 0.4), 
-              alpha: mapRange(t, 0, 1, 0.08, 0.002) * (0.7 + Math.random() * 0.6), 
-              hue: (baseColor.h + (t * 30)) % 360
+              alpha: mapRange(t, 0, 1, 0.11, 0.003) * bandAlpha * (0.7 + Math.random() * 0.6),
+              hue: (baseColor.h + (t * 30)) % 360,
+              aspect: randomRange(0.45, 1.35),
+              rotation: angle + randomRange(-0.9, 0.9),
+              densityBand
           });
+
+          // 3. Tiny incandescent particles break up the soft gradients and add scale.
+          if (j % 5 === 0) {
+            this.embers.push({
+              x: this.wrapX(x + (Math.random() - 0.5) * 55),
+              y: this.wrapY(y + (Math.random() - 0.5) * 55),
+              size: randomRange(0.7, 2.2),
+              hue: (baseColor.h + randomRange(35, 80)) % 360,
+              alpha: mapRange(t, 0, 1, 0.5, 0.08)
+            });
+          }
 
           // Occasional branching whisp
           if (j % 10 === 0 && j > 0) {
@@ -240,12 +304,38 @@ export class CrystalSmokeStyle extends Style {
     });
   }
 
+  _generateAtmosphere(data) {
+    this.vortexes = [];
+    this.lightRays = [];
+    const sample = data.filter((_, index) => index % 4 === 0);
+    sample.forEach((log, index) => {
+      const hue = this.palette[index % this.palette.length].h;
+      const x = this.wrapX(mapRange(log.mm, 0, 60, 0, this.width) + Math.cos(index * 2.1) * this.width * 0.18);
+      const y = this.wrapY(mapRange(log.hh, 0, 24, 0, this.height) + Math.sin(index * 1.3) * this.height * 0.12);
+      // 4. Low-contrast vortex pockets create negative space inside the plumes.
+      this.vortexes.push({ x, y, radius: mapRange(log.fm, 0, 100, 80, 240), hue, rotation: index * 1.73 });
+    });
+
+    // 5. Light shafts tie smoke, crystals, and the data-driven light direction together.
+    for (let i = 0; i < 4; i++) {
+      this.lightRays.push({
+        offset: mapRange(i, 0, 3, -0.38, 0.38),
+        width: randomRange(0.05, 0.13),
+        alpha: randomRange(0.025, 0.06)
+      });
+    }
+  }
+
   async process() {}
 
   render(ctx, width, height) {
     this._renderBackground(ctx, width, height);
-    this._renderSmoke(ctx);
+    this._renderLightRays(ctx, width, height);
     this._renderShards(ctx);
+    // Smoke stays in the foreground so the style reads as smoke first, crystals second.
+    this._renderSmoke(ctx);
+    this._renderVortexes(ctx);
+    this._renderEmbers(ctx);
     this._renderTexture(ctx, width, height);
   }
 
@@ -267,20 +357,98 @@ export class CrystalSmokeStyle extends Style {
   _renderSmoke(ctx) {
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
+
+    this.smokeRibbons.forEach(ribbon => {
+      ctx.beginPath();
+      ctx.moveTo(ribbon.startX, ribbon.startY);
+      ctx.quadraticCurveTo(ribbon.controlX, ribbon.controlY, ribbon.endX, ribbon.endY);
+      ctx.strokeStyle = `hsla(${ribbon.hue}, 85%, 56%, ${ribbon.alpha})`;
+      ctx.lineWidth = ribbon.width;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = `hsla(${ribbon.hue}, 100%, 55%, ${ribbon.alpha})`;
+      ctx.shadowBlur = ribbon.width * 1.8;
+      ctx.stroke();
+    });
+
+    this.smokeTendrils.forEach(tendril => {
+      ctx.beginPath();
+      ctx.moveTo(tendril.startX, tendril.startY);
+      ctx.quadraticCurveTo(tendril.controlX, tendril.controlY, tendril.endX, tendril.endY);
+      ctx.strokeStyle = `hsla(${tendril.hue}, 90%, 70%, ${tendril.alpha})`;
+      ctx.lineWidth = tendril.width;
+      ctx.shadowBlur = tendril.width * 3;
+      ctx.shadowColor = `hsla(${tendril.hue}, 100%, 62%, ${tendril.alpha})`;
+      ctx.stroke();
+    });
     
     this.smokePuffs.forEach(p => {
-        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation || 0);
+        ctx.scale(p.aspect || 1, 1);
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size);
         // Softer transition to transparent
-        grad.addColorStop(0, `hsla(${p.hue}, 90%, 25%, ${p.alpha})`);
+        const coreLightness = p.densityBand === 'core' ? 52 : (p.densityBand === 'body' ? 32 : 22);
+        grad.addColorStop(0, `hsla(${p.hue}, 90%, ${coreLightness}%, ${p.alpha})`);
         grad.addColorStop(0.5, `hsla(${p.hue}, 80%, 15%, ${p.alpha * 0.3})`);
         grad.addColorStop(1, 'transparent');
         
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
     });
     
+    ctx.restore();
+  }
+
+  _renderLightRays(ctx, width, height) {
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(this.lightSource.angle);
+    ctx.globalCompositeOperation = 'screen';
+    this.lightRays.forEach(ray => {
+      const x = ray.offset * width;
+      const grad = ctx.createLinearGradient(x, -height, x, height);
+      grad.addColorStop(0, 'transparent');
+      grad.addColorStop(0.45, `hsla(${this.lightSource.hue}, 95%, 70%, ${ray.alpha})`);
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x - ray.width * width / 2, -height, ray.width * width, height * 2);
+    });
+    ctx.restore();
+  }
+
+  _renderVortexes(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    this.vortexes.forEach(vortex => {
+      const grad = ctx.createRadialGradient(vortex.x, vortex.y, vortex.radius * 0.15, vortex.x, vortex.y, vortex.radius);
+      grad.addColorStop(0, 'rgba(0,0,0,0.22)');
+      grad.addColorStop(0.45, 'rgba(0,0,0,0.06)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(vortex.x, vortex.y, vortex.radius, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  _renderEmbers(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    this.embers.forEach(ember => {
+      const glow = ctx.createRadialGradient(ember.x, ember.y, 0, ember.x, ember.y, ember.size * 4);
+      glow.addColorStop(0, `hsla(${ember.hue}, 100%, 84%, ${ember.alpha})`);
+      glow.addColorStop(0.25, `hsla(${ember.hue}, 100%, 55%, ${ember.alpha * 0.5})`);
+      glow.addColorStop(1, 'transparent');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(ember.x, ember.y, ember.size * 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
     ctx.restore();
   }
 
@@ -354,7 +522,7 @@ export class CrystalSmokeStyle extends Style {
           ctx.beginPath();
           ctx.moveTo(f.cx, f.cy);
           ctx.lineTo(f.p1.x, f.p1.y);
-          ctx.strokeStyle = `rgba(255, 255, 255, 0.2)`;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
           ctx.lineWidth = 1;
           ctx.stroke();
       }

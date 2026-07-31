@@ -29,7 +29,6 @@ export class VaporwaveSunsetStyle extends Style {
 
   _initPalette(entry) {
     // Vaporwave classic: Pinks, Cyans, Purples
-    const baseHue = 300; // Magenta/Pink
     this.palette = [
       { h: 300, s: 100, l: 50 }, // Hot Pink
       { h: 180, s: 100, l: 50 }, // Cyan
@@ -39,11 +38,49 @@ export class VaporwaveSunsetStyle extends Style {
     
     // Hardware-limited colors (GBA feel)
     this.colors = {
-      sunTop: `hsl(40, 100%, 60%)`,
-      sunBottom: `hsl(320, 100%, 50%)`,
-      grid: `hsl(180, 100%, 50%)`,
+      sunTop: this._snapToGBA('hsl(40, 100%, 60%)'),
+      sunBottom: this._snapToGBA('hsl(320, 100%, 50%)'),
+      grid: this._snapToGBA('hsl(180, 100%, 50%)'),
       bg: '#050510'
     };
+    
+    this._initMountains();
+  }
+
+  _snapToGBA(colorStr) {
+    // Simplified 5-bit color snapping (32 levels per channel)
+    // For HSL, we'll just snap the L and S for now
+    return colorStr; // Placeholder for more complex snapping if needed
+  }
+
+  _initMountains() {
+    this.mountains = [];
+    const num = 4;
+    for (let i = 0; i < num; i++) {
+      const p = new Path2D();
+      const w = randomRange(this.width * 0.3, this.width * 0.6);
+      const h = randomRange(50, 150);
+      const x = randomRange(0, this.width);
+      p.moveTo(-w/2, 0);
+      p.lineTo(0, -h);
+      p.lineTo(w/2, 0);
+      p.closePath();
+      this.mountains.push({ x, y: this.horizonY, path: p, color: `hsl(280, 80%, ${20 - i * 4}%)` });
+    }
+  }
+
+  _drawMountains(ctx) {
+    this.mountains.forEach(m => {
+      ctx.save();
+      ctx.translate(m.x, m.y);
+      ctx.fillStyle = m.color;
+      ctx.fill(m.path);
+      // Highlight edge
+      ctx.strokeStyle = 'hsl(300, 100%, 50%, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke(m.path);
+      ctx.restore();
+    });
   }
 
   _initSun(entry) {
@@ -127,6 +164,7 @@ export class VaporwaveSunsetStyle extends Style {
     ctx.fillRect(0, 0, width, height);
 
     this._drawSun(ctx);
+    this._drawMountains(ctx);
     this._drawGrid(ctx);
     this._drawTrees(ctx);
 
@@ -217,6 +255,30 @@ export class VaporwaveSunsetStyle extends Style {
         ctx.moveTo(vanishingX, horizon);
         ctx.lineTo(xAtBottom, this.height);
         ctx.stroke();
+    }
+
+    // Grid Corruption (Neon Tiles)
+    const latest = this.data[this.data.length - 1];
+    if (Math.random() > 0.7) {
+        const numBlocks = Math.floor(mapRange(latest.pt || 50, 0, 500, 1, 5));
+        for (let i = 0; i < numBlocks; i++) {
+            const row = Math.floor(randomRange(2, 10));
+            const col = Math.floor(randomRange(0, numVerticalLines - 2));
+            const y1 = horizon + Math.pow(row / numHorizontalLines, 2) * (this.height - horizon);
+            const y2 = horizon + Math.pow((row + 1) / numHorizontalLines, 2) * (this.height - horizon);
+            const x1 = mapRange(col, 0, numVerticalLines - 1, -this.width * 0.2, this.width * 1.2);
+            const x2 = mapRange(col + 1, 0, numVerticalLines - 1, -this.width * 0.2, this.width * 1.2);
+            
+            ctx.fillStyle = Math.random() > 0.5 ? this.colors.grid : this.colors.sunBottom;
+            ctx.globalAlpha = 0.4;
+            ctx.beginPath();
+            ctx.moveTo(vanishingX + (x1 - vanishingX) * ((y1 - horizon) / (this.height - horizon)), y1);
+            ctx.lineTo(vanishingX + (x2 - vanishingX) * ((y1 - horizon) / (this.height - horizon)), y1);
+            ctx.lineTo(vanishingX + (x2 - vanishingX) * ((y2 - horizon) / (this.height - horizon)), y2);
+            ctx.lineTo(vanishingX + (x1 - vanishingX) * ((y2 - horizon) / (this.height - horizon)), y2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
     }
 
     ctx.restore();

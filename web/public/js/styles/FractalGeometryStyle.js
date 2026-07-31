@@ -142,7 +142,7 @@ export class FractalGeometryStyle extends Style {
     ctx.lineWidth = config.lineWidth * 0.4;
     this._path(ctx, x, y, cpX, cpY, x2, y2);
 
-    const nextLength = length * 0.73;
+    const nextLength = length * 0.61803398875;
     this._drawRecursiveBranch(ctx, x2, y2, nextLength, angle - config.branchAngle, depth - 1, config);
     this._drawRecursiveBranch(ctx, x2, y2, nextLength, angle + config.branchAngle, depth - 1, config);
   }

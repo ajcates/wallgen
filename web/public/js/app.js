@@ -6,6 +6,7 @@ import { CrystalSmokeStyle } from './styles/CrystalSmokeStyle.js';
 import { NebulaConstellationStyle } from './styles/NebulaConstellationStyle.js';
 import { GlitchStyle } from './styles/GlitchStyle.js';
 import { SynapticEchoStyle } from './styles/SynapticEchoStyle.js';
+import { LiquidSteelStyle } from './styles/LiquidSteelStyle.js';
 
 class App {
     constructor() {
@@ -13,6 +14,7 @@ class App {
         this.ctx = this.canvas.getContext('2d');
         this.styles = {
             'synaptic': SynapticEchoStyle,
+            'liquidsteel': LiquidSteelStyle,
             'zigzag': ZigZagFractalStyle,
             'fractal': FractalGeometryStyle,
             'curves': FlowingCurvesStyle,

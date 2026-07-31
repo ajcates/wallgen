@@ -6,22 +6,18 @@ export class GeometricGridStyle extends Style {
     super(config);
     this.shapes = [];
   }
-static get metadata() {
-  return [
-    { id: 'columns', name: 'Columns', type: 'range', min: 2, max: 20, default: 8 },
-    { id: 'rows', name: 'Rows', type: 'range', min: 2, max: 30, default: 12 },
-    { id: 'baseSize', name: 'Base Size', type: 'range', min: 5, max: 100, default: 30 },
-    { id: 'opacity', name: 'Global Opacity', type: 'range', min: 0.1, max: 1.0, step: 0.1, default: 0.7 },
-    { id: 'animationSpeed', name: 'Animation Speed', type: 'range', min: 0, max: 5, step: 0.1, default: 1.0 }
-  ];
-}
 
-async process() {
-  const speed = this.config.animationSpeed || 1.0;
-  this.shapes.forEach((s, i) => {
-      s.rotation += 0.02 * speed * (i % 2 === 0 ? 1 : -1);
-  });
-}
+  static get metadata() {
+    return [
+      { id: 'columns', name: 'Columns', type: 'range', min: 2, max: 20, default: 8 },
+      { id: 'rows', name: 'Rows', type: 'range', min: 2, max: 30, default: 12 },
+      { id: 'baseSize', name: 'Base Size', type: 'range', min: 5, max: 100, default: 30 },
+      { id: 'opacity', name: 'Global Opacity', type: 'range', min: 0.1, max: 1.0, step: 0.1, default: 0.7 },
+      { id: 'animationSpeed', name: 'Animation Speed', type: 'range', min: 0, max: 5, step: 0.1, default: 1.0 }
+    ];
+  }
+
+  async init(data) {
     const cols = this.config.columns || 8;
     const rows = this.config.rows || 12;
     
@@ -38,6 +34,13 @@ async process() {
         sides: Math.max(3, Math.floor(mapRange(log.fm, 0, 100, 3, 8))),
         rotation: (log.mm / 60) * Math.PI * 2
       };
+    });
+  }
+
+  async process() {
+    const speed = this.config.animationSpeed || 1.0;
+    this.shapes.forEach((s, i) => {
+      s.rotation += 0.02 * speed * (i % 2 === 0 ? 1 : -1);
     });
   }
 

@@ -28,15 +28,7 @@ CONFIG_FILE="$PROJECT_DIR/config.env"
 # 2. Interactive Input
 echo ""
 echo "Select your wallpaper style:"
-echo "1) curves (Infinite Ribbon - Data Driven)"
-echo "2) grid (Geometric Polygons)"
-echo "3) glitch (Cyber Glitch)"
-echo "4) smoke (Crystal Shards & Volumetric Smoke)"
-echo "5) nebula (Cosmic Clusters)"
-echo "6) fractal (Recursive Mandalas)"
-echo "7) expressive (Material 3 Expressive - Fresh every time)"
-read -p "Choose a style [1-7]: " style_choice
-
+# ... (styles 1-7) ...
 case $style_choice in
     1) STYLE="curves" ;;
     2) STYLE="grid" ;;
@@ -56,8 +48,8 @@ read -p "Enter device height [default: 2400]: " HEIGHT
 HEIGHT=${HEIGHT:-2400}
 
 echo ""
-read -p "Update frequency in minutes [default: 20]: " FREQ
-FREQ=${FREQ:-20}
+read -p "Update frequency in minutes [default: 60 (Hourly Rotation)]: " FREQ
+FREQ=${FREQ:-60}
 
 # 3. Save to config.env
 echo "Saving preferences..."
@@ -72,8 +64,14 @@ EOF
 chmod +x update_wallpaper.sh
 SCRIPT_PATH=$(realpath update_wallpaper.sh)
 
-# Add to crontab
-(crontab -l 2>/dev/null | grep -v "$SCRIPT_PATH"; echo "*/$FREQ * * * * $SCRIPT_PATH") | crontab -
+# Add to crontab with the selected frequency
+if [ "$FREQ" -eq 60 ]; then
+    CRON_SCHEDULE="0 * * * *"
+else
+    CRON_SCHEDULE="*/$FREQ * * * *"
+fi
+
+(crontab -l 2>/dev/null | grep -v "$SCRIPT_PATH"; echo "$CRON_SCHEDULE $SCRIPT_PATH") | crontab -
 
 # Ensure crond is running
 pgrep crond > /dev/null || crond
@@ -82,6 +80,8 @@ echo "-----------------------------------------------"
 echo "Setup Complete!"
 echo "Style: $STYLE"
 echo "Resolution: ${WIDTH}x${HEIGHT}"
-echo "Updating every $FREQ minutes."
-echo "Log file: $PROJECT_DIR/wallpaper_bot.log"
+echo "Rotation: Every hour (on the hour)"
+echo ""
+echo "IMPORTANT: Run './update_wallpaper.sh' once manually to"
+echo "generate your initial pool of 10 wallpapers."
 echo "-----------------------------------------------"

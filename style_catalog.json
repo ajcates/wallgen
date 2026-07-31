@@ -1,0 +1,191 @@
+[
+  {
+    "id": "curves",
+    "name": "Flowing Curves",
+    "description": "Glowing cellular paths and flowing curves.",
+    "module": "./src/styles/FlowingCurvesStyle.js",
+    "class": "FlowingCurvesStyle"
+  },
+  {
+    "id": "grid",
+    "name": "Geometric Grid",
+    "description": "Structured rotating polygons and geometric grids.",
+    "module": "./src/styles/GeometricGridStyle.js",
+    "class": "GeometricGridStyle"
+  },
+  {
+    "id": "glitch",
+    "name": "Glitch",
+    "description": "Retro digital noise, scanlines, and artifacts.",
+    "module": "./src/styles/GlitchStyle.js",
+    "class": "GlitchStyle"
+  },
+  {
+    "id": "smoke",
+    "name": "Crystal Smoke",
+    "description": "Volumetric crystalline smoke and luminous shards.",
+    "module": "./src/styles/CrystalSmokeStyle.js",
+    "class": "CrystalSmokeStyle"
+  },
+  {
+    "id": "smoke2",
+    "name": "Crystal Smoke II",
+    "description": "An experimental variation on crystalline smoke.",
+    "module": "./src/styles/CrystalSmoke2Style.js",
+    "class": "CrystalSmoke2Style"
+  },
+  {
+    "id": "nebula",
+    "name": "Nebula Constellation",
+    "description": "Glowing space gas, stars, and constellation traces.",
+    "module": "./src/styles/NebulaConstellationStyle.js",
+    "class": "NebulaConstellationStyle"
+  },
+  {
+    "id": "fractal",
+    "name": "Fractal Geometry",
+    "description": "Recursive kaleidoscopic geometric structures.",
+    "module": "./src/styles/FractalGeometryStyle.js",
+    "class": "FractalGeometryStyle"
+  },
+  {
+    "id": "zigzag",
+    "name": "Zigzag Fractal",
+    "description": "Angular, sharp-edged recursive fractals.",
+    "module": "./src/styles/ZigZagFractalStyle.js",
+    "class": "ZigZagFractalStyle"
+  },
+  {
+    "id": "expressive",
+    "name": "Expressive Material",
+    "description": "Layered Material-inspired painterly forms.",
+    "module": "./src/styles/ExpressiveMaterialStyle.js",
+    "class": "ExpressiveMaterialStyle"
+  },
+  {
+    "id": "shapes",
+    "name": "Expressive Shapes",
+    "description": "Bold Material-inspired geometric primitives.",
+    "module": "./src/styles/ExpressiveShapesStyle.js",
+    "class": "ExpressiveShapesStyle"
+  },
+  {
+    "id": "helix",
+    "name": "Double Helix",
+    "description": "Intertwining organic spiral structures.",
+    "module": "./src/styles/DoubleHelixFractalStyle.js",
+    "class": "DoubleHelixFractalStyle"
+  },
+  {
+    "id": "circuit",
+    "name": "Cyber Circuit",
+    "description": "High-tech glowing circuit traces and hardware.",
+    "module": "./src/styles/CyberCircuitStyle.js",
+    "class": "CyberCircuitStyle"
+  },
+  {
+    "id": "energy",
+    "name": "Energy Flow",
+    "description": "Iridescent flows, particles, and orbiting energy.",
+    "module": "./src/styles/EnergyFlowStyle.js",
+    "class": "EnergyFlowStyle"
+  },
+  {
+    "id": "synapse",
+    "name": "Synaptic Echo",
+    "description": "A neural data web with traveling signals.",
+    "module": "./src/styles/SynapticEchoStyle.js",
+    "class": "SynapticEchoStyle"
+  },
+  {
+    "id": "trill",
+    "name": "Trill",
+    "description": "Postmodern compositions with selective depth.",
+    "module": "./src/styles/TrillStyle.js",
+    "class": "TrillStyle"
+  },
+  {
+    "id": "ribbon",
+    "name": "Flowing Ribbons",
+    "description": "Layered ribbons sweeping through deep space.",
+    "module": "./src/styles/FlowingRibbonsStyle.js",
+    "class": "FlowingRibbonsStyle"
+  },
+  {
+    "id": "vortex",
+    "name": "Quantum Vortex",
+    "description": "Particle-rich quantum vortex structures.",
+    "module": "./src/styles/QuantumVortexStyle.js",
+    "class": "QuantumVortexStyle"
+  },
+  {
+    "id": "iso",
+    "name": "Isometric Data",
+    "description": "Dimensional isometric data structures.",
+    "module": "./src/styles/IsometricDataStyle.js",
+    "class": "IsometricDataStyle"
+  },
+  {
+    "id": "vaporwave",
+    "name": "Vaporwave Sunset",
+    "description": "Retro sunset gradients with pixel-glitch energy.",
+    "module": "./src/styles/VaporwaveSunsetStyle.js",
+    "class": "VaporwaveSunsetStyle"
+  },
+  {
+    "id": "liquidsteel",
+    "name": "Liquid Steel",
+    "description": "Swirling iridescent liquid metal.",
+    "module": "./src/styles/LiquidSteelStyle.js",
+    "class": "LiquidSteelStyle"
+  },
+  {
+    "id": "mandala",
+    "name": "Mandala Kaleidoscope",
+    "description": "Layered radial geometry with dimensional symmetry.",
+    "module": "./src/styles/MandalaKaleidoscopeStyle.js",
+    "class": "MandalaKaleidoscopeStyle"
+  },
+  {
+    "id": "symmetry",
+    "name": "Symmetry",
+    "description": "Ornate rotational forms generated from visual DNA.",
+    "module": "./src/styles/SymmetryStyle.js",
+    "class": "SymmetryStyle"
+  },
+  {
+    "id": "trap",
+    "name": "Trap",
+    "description": "Postmodern geometry inside crystalline smoke.",
+    "module": "./src/styles/TrapStyle.js",
+    "class": "TrapStyle"
+  },
+  {
+    "id": "lichen",
+    "name": "Lichen Bloom",
+    "description": "Organic growth, branching texture, and bloom.",
+    "module": "./src/styles/LichenBloomStyle.js",
+    "class": "LichenBloomStyle"
+  },
+  {
+    "id": "oil",
+    "name": "Oil Slick",
+    "description": "Iridescent oil-on-water over AMOLED black.",
+    "module": "./src/styles/OilSlickStyle.js",
+    "class": "OilSlickStyle"
+  },
+  {
+    "id": "beveled",
+    "name": "Beveled Circuits",
+    "description": "Embossed futuristic circuit-board relief.",
+    "module": "./src/styles/BeveledCircuitsStyle.js",
+    "class": "BeveledCircuitsStyle"
+  },
+  {
+    "id": "plasmo",
+    "name": "Plasmo",
+    "description": "Warped contour bundles and stirred AMOLED lava.",
+    "module": "./src/styles/PlasmoStyle.js",
+    "class": "PlasmoStyle"
+  }
+]
