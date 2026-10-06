@@ -108,6 +108,10 @@ const MODES = {
     microWidth: 0.045,
     seamWidth: 0.022,
     baseFlow: { x: 0.78, y: -0.12 },
+    boundaryBubbles: {
+      cell: 0.050, occupancy: 0.60, radius: [0.008, 0.036],
+      strength: [0.20, 0.65], fringe: 0.12
+    },
     filamentDensity: 1 / 850,
     filamentRange: [320, 2200],
     filamentWidth: [0.22, 1.45],
@@ -151,6 +155,10 @@ const MODES = {
     microWidth: 0.030,
     seamWidth: 0.016,
     baseFlow: { x: 0.22, y: 0.04 },
+    boundaryBubbles: {
+      cell: 0.044, occupancy: 0.66, radius: [0.006, 0.028],
+      strength: [0.18, 0.62], fringe: 0.14
+    },
     filamentDensity: 1 / 1800,
     filamentRange: [220, 1400],
     filamentWidth: [0.20, 0.72],
@@ -193,6 +201,10 @@ const MODES = {
     microWidth: 0.040,
     seamWidth: 0.018,
     baseFlow: { x: 0.16, y: -0.035 },
+    boundaryBubbles: {
+      cell: 0.060, occupancy: 0.52, radius: [0.009, 0.040],
+      strength: [0.24, 0.70], fringe: 0.10
+    },
     filamentDensity: 1 / 2300,
     filamentRange: [150, 950],
     filamentWidth: [0.25, 1.05],
@@ -553,6 +565,7 @@ export class PlasmoStyle extends Style {
     this._bubbleFlowDirX = 1;
     this._bubbleFlowDirY = 0;
     this._bubbleScratch = { dx: 0, dy: 0, rim: 0 };
+    this._boundaryBubbleSalt = 0;
   }
 
   async init(data) {
@@ -638,6 +651,7 @@ export class PlasmoStyle extends Style {
     this._bubbleTrailFreqAcross = bubbleRandom.range(3.0, 4.8);
     this._bubbleTrailOffsetA = bubbleRandom.range(0, 1000);
     this._bubbleTrailOffsetB = bubbleRandom.range(0, 1000);
+    this._boundaryBubbleSalt = (this.seed ^ 0x6d2b79f5) >>> 0;
 
     const random = new SeededRandom(this.seed);
     this._generateVortices(random);
@@ -1963,6 +1977,154 @@ export class PlasmoStyle extends Style {
     }
   }
 
+  /**
+   * Lens bubbles seated on the rendered color boundaries. Runs on the
+   * finished raster so "boundary" means whatever edge actually reads as one
+   * (contour seams, band changes, mass silhouettes) in every mode. Each
+   * cell of a coarse grid nominates its strongest edge pixel; a seeded roll
+   * then decides whether a bubble forms there, how big it is (a wide,
+   * skewed-small spread), how hard it refracts, and whether it straddles the
+   * seam, hugs one side or buds off it. Bubble outlines are wobbly, the
+   * refraction magnifies the paint beneath, and each color channel is
+   * sampled with a slightly different magnification near the rim for a
+   * chromatic fringe.
+   */
+  _applyBoundaryBubbles(image, field) {
+    const cfg = this.mode.boundaryBubbles;
+    if (!cfg || this.config.boundaryBubbles === false) return;
+
+    const w = field.width;
+    const h = field.height;
+    if (w < 24 || h < 24) return;
+    const salt = this._boundaryBubbleSalt;
+    const source = new Uint8ClampedArray(image.data);
+    const output = image.data;
+    const edge = new Float32Array(w * h);
+    const gradX = new Float32Array(w * h);
+    const gradY = new Float32Array(w * h);
+
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const index = y * w + x;
+        if (field.mask[index] < 0.3) continue;
+        const o = index * 4;
+        let magnitude = 0;
+        let best = 0;
+        let bx = 0;
+        let by = 0;
+        for (let c = 0; c < 3; c++) {
+          const gx = source[o + 4 + c] - source[o - 4 + c];
+          const gy = source[o + w * 4 + c] - source[o - w * 4 + c];
+          const m = gx * gx + gy * gy;
+          magnitude += m;
+          if (m > best) { best = m; bx = gx; by = gy; }
+        }
+        edge[index] = Math.sqrt(magnitude);
+        const length = Math.hypot(bx, by) || 1;
+        gradX[index] = bx / length;
+        gradY[index] = by / length;
+      }
+    }
+
+    const sampleChannel = (x, y, c) => {
+      const sx = clamp(x, 0, w - 1);
+      const sy = clamp(y, 0, h - 1);
+      const x0 = Math.floor(sx);
+      const y0 = Math.floor(sy);
+      const x1 = Math.min(w - 1, x0 + 1);
+      const y1 = Math.min(h - 1, y0 + 1);
+      const tx = sx - x0;
+      const ty = sy - y0;
+      return lerp(
+        lerp(source[(y0 * w + x0) * 4 + c], source[(y0 * w + x1) * 4 + c], tx),
+        lerp(source[(y1 * w + x0) * 4 + c], source[(y1 * w + x1) * 4 + c], tx),
+        ty
+      );
+    };
+
+    const cell = Math.max(8, Math.round(w * cfg.cell));
+    for (let cy = 0; cy * cell < h; cy++) {
+      for (let cx = 0; cx * cell < w; cx++) {
+        let peak = 0;
+        let peakIndex = -1;
+        const yEnd = Math.min(h - 1, (cy + 1) * cell);
+        const xEnd = Math.min(w - 1, (cx + 1) * cell);
+        for (let y = Math.max(1, cy * cell); y < yEnd; y++) {
+          for (let x = Math.max(1, cx * cell); x < xEnd; x++) {
+            const value = edge[y * w + x];
+            if (value > peak) { peak = value; peakIndex = y * w + x; }
+          }
+        }
+        if (peakIndex < 0) continue;
+
+        const edgeWeight = smoothstep(60, 220, peak);
+        if (bubbleCellHash(cx, cy, 20, salt) > cfg.occupancy * edgeWeight) continue;
+
+        const sizeRoll = bubbleCellHash(cx, cy, 21, salt);
+        const radius = w * lerp(cfg.radius[0], cfg.radius[1], Math.pow(sizeRoll, 2.2));
+        const strength = lerp(cfg.strength[0], cfg.strength[1], bubbleCellHash(cx, cy, 22, salt));
+        const placement = Math.floor(bubbleCellHash(cx, cy, 23, salt) * 3);
+        const side = bubbleCellHash(cx, cy, 24, salt) < 0.5 ? -1 : 1;
+        const offset = placement === 0 ? 0 : placement === 1 ? 0.45 : 0.95;
+
+        const px = peakIndex % w;
+        const py = (peakIndex - px) / w;
+        const centerX = px + gradX[peakIndex] * radius * offset * side
+          + (bubbleCellHash(cx, cy, 25, salt) - 0.5) * radius * 0.3;
+        const centerY = py + gradY[peakIndex] * radius * offset * side
+          + (bubbleCellHash(cx, cy, 26, salt) - 0.5) * radius * 0.3;
+        const cxi = Math.round(centerX);
+        const cyi = Math.round(centerY);
+        if (cxi < 0 || cyi < 0 || cxi >= w || cyi >= h) continue;
+        if (field.mask[cyi * w + cxi] < 0.3) continue;
+
+        const wobbleA = 0.06 + bubbleCellHash(cx, cy, 27, salt) * 0.10;
+        const wobbleB = 0.03 + bubbleCellHash(cx, cy, 28, salt) * 0.06;
+        const lobesA = 2 + Math.floor(bubbleCellHash(cx, cy, 29, salt) * 3);
+        const phaseA = bubbleCellHash(cx, cy, 30, salt) * TAU;
+        const phaseB = bubbleCellHash(cx, cy, 31, salt) * TAU;
+        const tilt = bubbleCellHash(cx, cy, 32, salt) * TAU;
+        const stretch = 1 + bubbleCellHash(cx, cy, 33, salt) * 0.32;
+        const tiltCos = Math.cos(tilt);
+        const tiltSin = Math.sin(tilt);
+        const reach = Math.ceil(radius * (1 + wobbleA + wobbleB) * stretch) + 1;
+
+        for (let y = Math.max(0, cyi - reach); y <= Math.min(h - 1, cyi + reach); y++) {
+          for (let x = Math.max(0, cxi - reach); x <= Math.min(w - 1, cxi + reach); x++) {
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const localX = dx * tiltCos + dy * tiltSin;
+            const localY = (-dx * tiltSin + dy * tiltCos) / stretch;
+            const angle = Math.atan2(localY, localX);
+            const outline = radius * (
+              1
+              + Math.sin(angle * lobesA + phaseA) * wobbleA
+              + Math.sin(angle * (lobesA + 2) + phaseB) * wobbleB
+            );
+            const d = Math.hypot(localX, localY) / outline;
+            if (d >= 1 || field.mask[y * w + x] < 0.3) continue;
+
+            const magnify = 1 - strength * (1 - d * d);
+            const fringe = cfg.fringe * strength
+              * smoothstep(0.35, 0.85, d) * (1 - smoothstep(0.85, 1, d));
+            const o = (y * w + x) * 4;
+            output[o] = Math.round(sampleChannel(
+              centerX + dx * magnify * (1 - fringe),
+              centerY + dy * magnify * (1 - fringe), 0
+            ));
+            output[o + 1] = Math.round(sampleChannel(
+              centerX + dx * magnify, centerY + dy * magnify, 1
+            ));
+            output[o + 2] = Math.round(sampleChannel(
+              centerX + dx * magnify * (1 + fringe),
+              centerY + dy * magnify * (1 + fringe), 2
+            ));
+          }
+        }
+      }
+    }
+  }
+
   _antialiasHighContrastEdges(image, width, height) {
     const source = new Uint8ClampedArray(image.data);
     const luminance = new Uint16Array(width * height);
@@ -2721,6 +2883,7 @@ export class PlasmoStyle extends Style {
     }
 
     this._applyLiquidSmudge(image, field);
+    this._applyBoundaryBubbles(image, field);
     if (this.mode.name === 'amoled-lava') {
       this._antialiasHighContrastEdges(image, field.width, field.height);
     }
