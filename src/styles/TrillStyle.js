@@ -1818,16 +1818,87 @@ export class TrillStyle extends Style {
 
   _renderStructuralPlanes(ctx) {
     ctx.save();
-    ctx.globalCompositeOperation = 'screen';
+    
+    // Capture background snapshot for frosted glass blur
+    const bgSnapshot = createCanvas(this.width, this.height);
+    const bgCtx = bgSnapshot.getContext('2d');
+    bgCtx.drawImage(ctx.canvas, 0, 0);
+
     for (const plane of this.structuralPlanes) {
-      ctx.save(); ctx.translate(plane.x, plane.y); ctx.rotate(plane.rotation);
-      const g = ctx.createLinearGradient(-plane.w / 2, -plane.h / 2, plane.w / 2, plane.h / 2);
-      g.addColorStop(0, `hsla(${plane.color.h}, ${plane.color.s}%, 62%, 0.2)`);
-      g.addColorStop(0.52, `hsla(${plane.color.h}, ${plane.color.s}%, 34%, 0.08)`);
-      g.addColorStop(1, 'rgba(0,0,0,0.02)');
-      ctx.fillStyle = g; ctx.fillRect(-plane.w / 2, -plane.h / 2, plane.w, plane.h);
-      ctx.strokeStyle = `hsla(${plane.color.h}, 100%, 82%, 0.4)`; ctx.lineWidth = 1.1; ctx.strokeRect(-plane.w / 2, -plane.h / 2, plane.w, plane.h);
-      ctx.setLineDash([8, 7]); ctx.strokeStyle = `hsla(${plane.color.h}, 85%, 76%, 0.26)`; ctx.beginPath(); ctx.moveTo(-plane.w / 2, 0); ctx.lineTo(plane.w / 2, 0); ctx.stroke();
+      ctx.save();
+      ctx.translate(plane.x, plane.y);
+      ctx.rotate(plane.rotation);
+      
+      const halfW = plane.w / 2;
+      const halfH = plane.h / 2;
+      
+      // Draw ambient drop shadow under the glass slab
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetX = 3;
+      ctx.shadowOffsetY = 5;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(-halfW, -halfH, plane.w, plane.h);
+      ctx.restore();
+
+      // Clip subsequent layers to the glass slab geometry
+      ctx.beginPath();
+      ctx.rect(-halfW, -halfH, plane.w, plane.h);
+      ctx.clip();
+
+      // Frosted blur effect (dual-pass local snapshot blur)
+      ctx.save();
+      ctx.rotate(-plane.rotation);
+      ctx.translate(-plane.x, -plane.y);
+      ctx.filter = 'blur(12px)';
+      ctx.drawImage(bgSnapshot, 0, 0);
+      ctx.restore();
+
+      // Glass surface reflection glaze (translucent overlay)
+      const g = ctx.createLinearGradient(-halfW, -halfH, halfW, halfH);
+      g.addColorStop(0, `hsla(${plane.color.h}, ${plane.color.s}%, 62%, 0.15)`);
+      g.addColorStop(0.5, `hsla(${plane.color.h}, ${plane.color.s}%, 34%, 0.05)`);
+      g.addColorStop(1, 'rgba(255,255,255,0.03)');
+      ctx.fillStyle = g;
+      ctx.fillRect(-halfW, -halfH, plane.w, plane.h);
+
+      // Procedural micro pinstripes (metadata tech line overlay)
+      ctx.strokeStyle = `hsla(${plane.color.h}, 85%, 76%, 0.12)`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      for (let y = -halfH + 10; y < halfH; y += 14) {
+        ctx.moveTo(-halfW + 6, y);
+        ctx.lineTo(halfW - 6, y);
+      }
+      ctx.stroke();
+
+      // Specular light edge highlight (top-left)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-halfW, halfH);
+      ctx.lineTo(-halfW, -halfH);
+      ctx.lineTo(halfW, -halfH);
+      ctx.stroke();
+
+      // Shadow/color edge (bottom-right)
+      ctx.strokeStyle = `hsla(${plane.color.h}, 100%, 82%, 0.25)`;
+      ctx.beginPath();
+      ctx.moveTo(halfW, -halfH);
+      ctx.lineTo(halfW, halfH);
+      ctx.lineTo(-halfW, halfH);
+      ctx.stroke();
+
+      // Prismatic refraction line (subtle rainbow colored edge highlight)
+      ctx.strokeStyle = 'rgba(255, 100, 200, 0.22)';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(-halfW + 1.2, halfH - 1.2);
+      ctx.lineTo(-halfW + 1.2, -halfH + 1.2);
+      ctx.lineTo(halfW - 1.2, -halfH + 1.2);
+      ctx.stroke();
+
       ctx.restore();
     }
     ctx.restore();
@@ -1910,13 +1981,42 @@ export class TrillStyle extends Style {
     const r = s.size * 0.5;
     ctx.save();
     ctx.clip(s.path);
+    
+    // 1. Soft-light standard shading gradient
     ctx.globalCompositeOperation = 'soft-light';
     const highlight = ctx.createLinearGradient(-r, -r, r, r);
     highlight.addColorStop(0, 'rgba(255,255,255,0.26)');
     highlight.addColorStop(0.32, 'rgba(255,255,255,0.04)');
     highlight.addColorStop(0.7, 'rgba(0,0,0,0.05)');
     highlight.addColorStop(1, 'rgba(0,0,0,0.35)');
-    ctx.fillStyle = highlight; ctx.fillRect(-r, -r, s.size, s.size);
+    ctx.fillStyle = highlight; 
+    ctx.fillRect(-r, -r, s.size, s.size);
+    ctx.restore();
+
+    // 2. Specular Bevel Highlights and Shadows
+    ctx.save();
+    ctx.clip(s.path);
+    
+    const bevelSize = Math.max(1.5, s.size * 0.015);
+    const lx = Math.cos(this.lightAngle) * bevelSize;
+    const ly = Math.sin(this.lightAngle) * bevelSize;
+    
+    // Light-facing highlight bevel edge
+    ctx.save();
+    ctx.translate(-lx, -ly);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = bevelSize;
+    ctx.stroke(s.path);
+    ctx.restore();
+    
+    // Shadow-facing bevel edge
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.lineWidth = bevelSize;
+    ctx.stroke(s.path);
+    ctx.restore();
+    
     ctx.restore();
   }
 
@@ -1950,20 +2050,76 @@ export class TrillStyle extends Style {
   }
 
   _renderStripes(ctx, layer = 'all') {
-    ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
     for (const conn of this.connections) {
       if (layer !== 'all' && conn.layer !== layer) continue;
-      const s1 = this.shapes[conn.from], s2 = this.shapes[conn.to], color = `hsl(${conn.color.h}, 100%, 60%)`;
-      ctx.shadowColor = color; ctx.shadowBlur = 2;
+      const s1 = this.shapes[conn.from];
+      const s2 = this.shapes[conn.to];
+      if (!s1 || !s2) continue;
+
+      const color = `hsl(${conn.color.h}, 100%, 60%)`;
+      const baseWidth = conn.width || 3.0;
       const offs = this._getStripeOffsets(conn.stripeType);
-      offs.forEach((o, i) => {
-        ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = conn.gazeGuide ? 0.2 : 0.08; ctx.lineWidth = conn.gazeGuide ? (i === 1 ? 1.8 : 0.85) : conn.stripeType === 'double' ? 0.9 : 1.1; this._drawStripePath(ctx, s1, s2, o, conn.controlPoint);
-        if (conn.gazeGuide || Math.random() > 0.8) { ctx.strokeStyle = '#fff'; ctx.globalAlpha = conn.gazeGuide ? 0.3 : 0.15; ctx.setLineDash(conn.gazeGuide ? [8, 26] : [12, 48]); this._drawStripePath(ctx, s1, s2, o, conn.controlPoint); }
+
+      offs.forEach((o) => {
+        ctx.save();
+
+        // 1. Wide Ambient Glow
+        ctx.strokeStyle = `hsla(${conn.color.h}, 100%, 65%, 0.06)`;
+        ctx.lineWidth = baseWidth * 3.5;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 4;
+        this._drawStripePath(ctx, s1, s2, o, conn.controlPoint);
+
+        // 2. Mid Glow Envelope
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = `hsla(${conn.color.h}, 100%, 75%, 0.16)`;
+        ctx.lineWidth = baseWidth * 1.8;
+        this._drawStripePath(ctx, s1, s2, o, conn.controlPoint);
+
+        // 3. Core Filament Light
+        ctx.strokeStyle = `hsla(${conn.color.h}, 100%, 85%, 0.55)`;
+        ctx.lineWidth = baseWidth * 0.8;
+        this._drawStripePath(ctx, s1, s2, o, conn.controlPoint);
+
+        // 4. White-Hot Filament Core
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = baseWidth * 0.24;
+        this._drawStripePath(ctx, s1, s2, o, conn.controlPoint);
+
+        // Flowing Dashed Overlay
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = 0.2;
+        ctx.lineWidth = baseWidth * 0.4;
+        ctx.setLineDash([10, 30]);
+        this._drawStripePath(ctx, s1, s2, o, conn.controlPoint);
+
         ctx.restore();
       });
-      if (conn.gazeGuide || Math.random() > 0.4) {
-        const t = conn.gazeGuide ? 0.5 : Math.random(); let p = conn.controlPoint ? getQuadraticBezier(t, s1, conn.controlPoint, s2) : { x: s1.x + (s2.x - s1.x) * t, y: s1.y + (s2.y - s1.y) * t };
-        ctx.save(); const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 10); g.addColorStop(0, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'transparent'); ctx.fillStyle = g; ctx.shadowColor = color; ctx.shadowBlur = 3; ctx.beginPath(); ctx.arc(p.x, p.y, 2.0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+      // Flowing data nodes along connection
+      if (conn.gazeGuide || Math.random() > 0.3) {
+        const t = conn.gazeGuide ? 0.5 : Math.random();
+        let p = conn.controlPoint
+          ? getQuadraticBezier(t, s1, conn.controlPoint, s2)
+          : { x: s1.x + (s2.x - s1.x) * t, y: s1.y + (s2.y - s1.y) * t };
+
+        ctx.save();
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 8);
+        g.addColorStop(0, 'rgba(255,255,255,0.75)');
+        g.addColorStop(0.3, `hsla(${conn.color.h}, 100%, 75%, 0.4)`);
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6.0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
     }
     ctx.restore();

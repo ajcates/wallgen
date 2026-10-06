@@ -256,6 +256,265 @@ test('PlasmoStyle defaults to gently stirred AMOLED lava blobs', async () => {
   assert.deepEqual(first.blobs, second.blobs);
 });
 
+test('PlasmoStyle keeps its trance flow off-center and asymmetrical', async () => {
+  const style = new PlasmoStyle({ seed: 812, variant: 'amoled-lava' });
+  style.width = 180;
+  style.height = 360;
+  await style.init(sampleData);
+
+  assert.equal(style.tranceAccentsEnabled, false);
+  assert.ok(
+    Math.hypot(style.tranceCenter.x - 0.5, style.tranceCenter.y - 0.5) > 0.03,
+    'the focal center should sit noticeably off-axis'
+  );
+
+  const aspect = style.height / style.width;
+  const quadrants = new Set();
+  for (let step = 0; step < 24; step++) {
+    const angle = step / 24 * Math.PI * 2;
+    const mapped = style._mapTranceDomain(
+      style.tranceCenter.x + Math.cos(angle) * 0.30,
+      style.tranceCenter.y + Math.sin(angle) * 0.30 / aspect,
+      aspect
+    );
+    const dx = mapped.u - style.tranceCenter.x;
+    const dy = mapped.v * aspect - style.tranceCenter.y * aspect;
+    quadrants.add(`${dx >= 0 ? 1 : -1},${dy >= 0 ? 1 : -1}`);
+  }
+
+  assert.equal(quadrants.size, 4, 'the flow should not fold the canvas into one repeated wedge');
+
+  const seamRadius = 0.31;
+  const seamOffset = 0.0001;
+  const aboveSeam = style._mapTranceDomain(
+    style.tranceCenter.x - seamRadius,
+    style.tranceCenter.y + seamOffset,
+    aspect
+  );
+  const belowSeam = style._mapTranceDomain(
+    style.tranceCenter.x - seamRadius,
+    style.tranceCenter.y - seamOffset,
+    aspect
+  );
+  assert.ok(
+    Math.hypot(aboveSeam.u - belowSeam.u, aboveSeam.v - belowSeam.v) < 0.003,
+    'the angular wrap should not leave a fold line through the blob'
+  );
+
+  const sector = Math.PI * 2 / style.tranceProfile.symmetry;
+  const firstSector = style._mapTranceDomain(
+    style.tranceCenter.x + 0.27,
+    style.tranceCenter.y,
+    aspect
+  );
+  const repeatedSector = style._mapTranceDomain(
+    style.tranceCenter.x + Math.cos(sector) * 0.27,
+    style.tranceCenter.y + Math.sin(sector) * 0.27 / aspect,
+    aspect
+  );
+  assert.ok(
+    Math.abs(firstSector.angularEcho - repeatedSector.angularEcho) > 0.12,
+    'default contour flow should not repeat in mandala sectors'
+  );
+
+  const explicitMandala = new PlasmoStyle({
+    seed: 812,
+    variant: 'amoled-lava',
+    trance: 'spiral-iris'
+  });
+  explicitMandala.width = 180;
+  explicitMandala.height = 360;
+  await explicitMandala.init(sampleData);
+  assert.equal(explicitMandala.tranceAccentsEnabled, true);
+  assert.ok(explicitMandala.blobs.length > style.blobs.length);
+});
+
+test('PlasmoStyle uses two or three off-center radial twists with seeded directions', async () => {
+  const opposed = new PlasmoStyle({ seed: 812, variant: 'amoled-lava' });
+  const aligned = new PlasmoStyle({ seed: 808, variant: 'amoled-lava' });
+  opposed.width = aligned.width = 180;
+  opposed.height = aligned.height = 360;
+  await opposed.init(sampleData);
+  await aligned.init(sampleData);
+
+  for (const style of [opposed, aligned]) {
+    assert.ok(style.radialTwists.length >= 2 && style.radialTwists.length <= 3);
+    assert.ok(style.radialTwists.every(twist => (
+      twist.x >= 0.14 && twist.x <= 0.86
+      && twist.y >= 0.24 && twist.y <= 1.76
+    )));
+    assert.ok(style.radialTwists.some(twist => (
+      Math.hypot(twist.x - 0.5, twist.y - 1) > 0.18
+    )));
+
+    const aspect = style.height / style.width;
+    for (const twist of style.radialTwists) {
+      const sourceU = twist.x + twist.radius * 0.48;
+      const sourceV = twist.y / aspect;
+      const mapped = style._mapTranceDomain(sourceU, sourceV, aspect);
+      assert.ok(
+        Math.hypot(mapped.u - sourceU, mapped.v - sourceV) > 0.008,
+        'each local twist should visibly turn its surrounding contour field'
+      );
+    }
+  }
+
+  assert.equal(opposed.radialTwistsOpposed, true);
+  assert.ok(opposed.radialTwists.some(twist => twist.strength < 0));
+  assert.ok(opposed.radialTwists.some(twist => twist.strength > 0));
+  assert.equal(aligned.radialTwistsOpposed, false);
+  assert.equal(new Set(aligned.radialTwists.map(twist => Math.sign(twist.strength))).size, 1);
+});
+
+test('PlasmoStyle blends slight saturation differences through lava blobs', async () => {
+  const style = new PlasmoStyle({ seed: 1977, variant: 'amoled-lava', renderScale: 0.4 });
+  style.width = 150;
+  style.height = 280;
+  await style.init(sampleData);
+
+  const blobSaturations = style.blobs.map(blob => blob.saturation);
+  assert.ok(Math.max(...blobSaturations) - Math.min(...blobSaturations) > 0.06);
+  assert.ok(blobSaturations.every(value => value >= 0.93 && value <= 1.08));
+
+  const field = style._buildPaintField(style.width, style.height);
+  const visibleSaturations = [];
+  let maximumNeighborChange = 0;
+  for (let y = 0; y < field.height; y += 3) {
+    for (let x = 0; x < field.width; x += 3) {
+      const index = y * field.width + x;
+      if (field.mask[index] < 0.3) continue;
+      visibleSaturations.push(field.blobSaturation[index]);
+      if (x + 1 < field.width) {
+        maximumNeighborChange = Math.max(
+          maximumNeighborChange,
+          Math.abs(field.blobSaturation[index] - field.blobSaturation[index + 1])
+        );
+      }
+    }
+  }
+
+  assert.ok(Math.max(...visibleSaturations) - Math.min(...visibleSaturations) > 0.035);
+  assert.ok(maximumNeighborChange < 0.035, 'saturation changes should blend smoothly');
+});
+
+test('PlasmoStyle gives blobs varied soft lighting and twisted contour gaps', async () => {
+  const style = new PlasmoStyle({ seed: 1977, variant: 'amoled-lava', renderScale: 0.4 });
+  style.width = 150;
+  style.height = 280;
+  await style.init(sampleData);
+
+  assert.ok(new Set(style.blobs.map(blob => blob.lightAngle.toFixed(2))).size >= 6);
+  assert.ok(style.blobs.some(blob => blob.gradientTwist < 0));
+  assert.ok(style.blobs.some(blob => blob.gradientTwist > 0));
+
+  const field = style._buildPaintField(style.width, style.height);
+  const shadows = [];
+  const highlights = [];
+  const gapTwists = [];
+  for (let index = 0; index < field.mask.length; index += 5) {
+    if (field.mask[index] < 0.35) continue;
+    shadows.push(field.blobShadow[index]);
+    highlights.push(field.blobHighlight[index]);
+    gapTwists.push(field.blobGapTwist[index]);
+  }
+
+  assert.ok(Math.max(...shadows) - Math.min(...shadows) > 0.10);
+  assert.ok(Math.max(...highlights) - Math.min(...highlights) > 0.10);
+  assert.ok(Math.max(...gapTwists) - Math.min(...gapTwists) > 0.45);
+});
+
+test('PlasmoStyle derives lava color gradients from each organic blob form', async () => {
+  const style = new PlasmoStyle({ seed: 1977, variant: 'amoled-lava' });
+  style.width = 180;
+  style.height = 360;
+  await style.init(sampleData);
+
+  const blob = style.blobs[0];
+  style.blobs = [blob];
+  const aspect = style.height / style.width;
+  const cosine = Math.cos(blob.rotation);
+  const sine = Math.sin(blob.rotation);
+  const sampleFormRing = radius => {
+    const coordinates = [];
+    for (let step = 0; step < 12; step++) {
+      const angle = step / 12 * Math.PI * 2;
+      const organicRadius = 1
+        + Math.sin(angle * blob.lobes + blob.phase) * blob.wobble
+        + Math.sin(
+          angle * (blob.lobes + 2) - blob.phase * 0.63
+        ) * blob.wobble * 0.42;
+      const localX = Math.cos(angle) * blob.radius * organicRadius * radius;
+      const localY = Math.sin(angle) * blob.radius * blob.stretch * organicRadius * radius;
+      const u = blob.x + localX * cosine - localY * sine;
+      const worldY = blob.y + localX * sine + localY * cosine;
+      const pigment = {};
+      style._blobInfluence(u, worldY / aspect, aspect, null, pigment);
+      coordinates.push(pigment.form);
+    }
+    return coordinates;
+  };
+  const innerCoordinates = sampleFormRing(0.36);
+  const outerCoordinates = sampleFormRing(0.72);
+  const average = values => values.reduce((total, value) => total + value, 0)
+    / values.length;
+
+  assert.ok(
+    average(outerCoordinates) - average(innerCoordinates) > 0.24,
+    'gradient progression should primarily follow distance through the blob form'
+  );
+  assert.ok(
+    Math.max(...outerCoordinates) - Math.min(...outerCoordinates) > 0.08,
+    'gradient rings should twist rather than repeat as uniform outlines'
+  );
+  assert.ok(
+    Math.max(...outerCoordinates) - Math.min(...outerCoordinates) < 0.24,
+    'twisting should not overwhelm the underlying blob silhouette'
+  );
+});
+
+test('PlasmoStyle carves seeded small holes that redirect contours inside large blobs', async () => {
+  const style = new PlasmoStyle({ seed: 1977, variant: 'amoled-lava' });
+  style.width = 180;
+  style.height = 360;
+  await style.init(sampleData);
+
+  assert.ok(style.blobHoles.length >= 3);
+  assert.ok(style.blobHoles.length <= style.blobs.length * 2);
+  assert.ok(style.blobHoles.every(hole => {
+    const sourceBlob = style.blobs.filter(blob => blob.radius >= 0.12)[hole.blobIndex];
+    return sourceBlob
+      && hole.radius < sourceBlob.radius * 0.17
+      && Math.hypot(hole.x - sourceBlob.x, hole.y - sourceBlob.y)
+        < sourceBlob.radius * sourceBlob.stretch * 0.62;
+  }));
+
+  const aspect = style.height / style.width;
+  const hole = style.blobHoles[0];
+  const centerPigment = {};
+  const carvedInfluence = style._blobInfluence(
+    hole.x,
+    hole.y / aspect,
+    aspect,
+    null,
+    centerPigment
+  );
+  const holes = style.blobHoles;
+  style.blobHoles = [];
+  const solidInfluence = style._blobInfluence(hole.x, hole.y / aspect, aspect);
+  style.blobHoles = holes;
+  const ringPigment = {};
+  style._blobInfluence(
+    hole.x + hole.radius,
+    hole.y / aspect,
+    aspect,
+    null,
+    ringPigment
+  );
+
+  assert.ok(solidInfluence - carvedInfluence > 0.7, 'hole centers should remove blob mass');
+  assert.ok(ringPigment.holeFlow > centerPigment.holeFlow + 0.08);
+});
+
 test('PlasmoStyle AMOLED lava keeps colorful stirred blobs suspended in true black', async () => {
   const { style, pixels } = await renderStyle('amoled-lava', 1977, 170, 320, 'aurora');
   const stats = pixelStats(pixels);
@@ -294,13 +553,241 @@ test('PlasmoStyle gives lava bands offset highlight and shadow relief', async ()
   assert.ok(shadowAtShadow > 0.95);
 });
 
+test('PlasmoStyle adds sparse semi-transparent cuts inside selected gradient bands', async () => {
+  const style = new PlasmoStyle({ seed: 1977, variant: 'amoled-lava' });
+  style.width = 160;
+  style.height = 300;
+  await style.init(sampleData);
+
+  const opacities = [];
+  for (let band = -40; band <= 40; band++) {
+    for (let step = 0; step <= 100; step++) {
+      opacities.push(style._gradientSplitOpacity(band, step / 100));
+    }
+  }
+
+  const translucent = opacities.filter(opacity => opacity < 0.99);
+  assert.ok(translucent.length > 0, 'some bands should contain translucent cuts');
+  assert.ok(translucent.length < opacities.length * 0.08, 'cuts should remain occasional');
+  assert.ok(Math.min(...translucent) >= 0.675, 'cuts should retain visible pigment');
+
+  const ultraviolet = new PlasmoStyle({ seed: 1977, variant: 'ultraviolet-current' });
+  ultraviolet.width = 160;
+  ultraviolet.height = 300;
+  await ultraviolet.init(sampleData);
+  assert.equal(
+    ultraviolet._gradientSplitOpacity(0, 0.5),
+    1,
+    'dense ultraviolet contours should remain uninterrupted'
+  );
+});
+
+test('PlasmoStyle subtly shifts hue and value across repeated gradient cycles', async () => {
+  const style = new PlasmoStyle({
+    seed: 1977,
+    variant: 'amoled-lava',
+    colorway: 'prism'
+  });
+  style.width = 160;
+  style.height = 300;
+  await style.init(sampleData);
+
+  const first = style._samplePalette(0.125);
+  const repeated = style._samplePalette(1.125);
+  const repeatDifference = Math.abs(first.r - repeated.r)
+    + Math.abs(first.g - repeated.g)
+    + Math.abs(first.b - repeated.b);
+
+  assert.ok(repeatDifference > 2, 'repeated palette cycles should not be identical');
+  assert.ok(repeatDifference < 90, 'cycle-to-cycle color drift should remain subtle');
+
+  const top = style._crossGradientDrift(0.5, 0);
+  const middle = style._crossGradientDrift(0.5, 0.5);
+  const bottom = style._crossGradientDrift(0.5, 1);
+  const crossAxisRange = Math.max(top.palette, middle.palette, bottom.palette)
+    - Math.min(top.palette, middle.palette, bottom.palette);
+  const crossValueRange = Math.max(top.value, middle.value, bottom.value)
+    - Math.min(top.value, middle.value, bottom.value);
+  assert.ok(crossAxisRange > 0.004, 'hue should also drift across the gradient direction');
+  assert.ok(crossValueRange > 0.012, 'value should also drift across the gradient direction');
+  assert.ok(
+    Math.abs(style.gradientCrossDirection.y) > Math.abs(style.gradientCrossDirection.x),
+    'mostly horizontal flow should receive mostly vertical color variation'
+  );
+
+  const duplicate = new PlasmoStyle({
+    seed: 1977,
+    variant: 'amoled-lava',
+    colorway: 'prism'
+  });
+  duplicate.width = 160;
+  duplicate.height = 300;
+  await duplicate.init(sampleData);
+  assert.deepEqual(duplicate._samplePalette(1.125), repeated);
+  assert.deepEqual(duplicate._crossGradientDrift(0.5, 1), bottom);
+});
+
+test('PlasmoStyle keeps soft varied drip contours subtly inside lava shapes', async () => {
+  const style = new PlasmoStyle({
+    seed: 1977,
+    variant: 'amoled-lava',
+    colorway: 'prism'
+  });
+  style.width = 160;
+  style.height = 300;
+  await style.init(sampleData);
+
+  const canvas = createCanvas(160, 300);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, 160, 300);
+  style._renderRaster(ctx, 160, 300);
+  const before = ctx.getImageData(0, 0, 160, 300).data;
+  const strokeCount = style._renderBlobDripContours(ctx, 160, 300);
+  const after = ctx.getImageData(0, 0, 160, 300).data;
+  const colorShifts = new Set();
+  let changedPixels = 0;
+  let exteriorChanges = 0;
+  let maximumChange = 0;
+  let totalChange = 0;
+
+  for (let index = 0; index < before.length; index += 4) {
+    const redChange = after[index] - before[index];
+    const greenChange = after[index + 1] - before[index + 1];
+    const blueChange = after[index + 2] - before[index + 2];
+    const change = Math.max(
+      Math.abs(redChange),
+      Math.abs(greenChange),
+      Math.abs(blueChange)
+    );
+    if (change === 0) continue;
+
+    changedPixels++;
+    totalChange += change;
+    maximumChange = Math.max(maximumChange, change);
+    if (Math.max(before[index], before[index + 1], before[index + 2]) < 3) {
+      exteriorChanges++;
+    }
+    colorShifts.add([
+      Math.sign(redChange),
+      Math.sign(greenChange),
+      Math.sign(blueChange)
+    ].join(','));
+  }
+
+  assert.ok(strokeCount >= 16, 'multiple contour shells should expand from the blobs');
+  assert.ok(changedPixels > 1200, 'soft contour pigment should remain present');
+  assert.equal(exteriorChanges, 0, 'overlay contours should preserve the black exterior');
+  assert.ok(colorShifts.size >= 8, 'inner contours should retain varied palette shifts');
+  assert.ok(maximumChange <= 8, 'blurred contour accents should remain low contrast');
+  assert.ok(
+    totalChange / changedPixels < 3,
+    'overlay contours should be very subtle on average'
+  );
+});
+
+test('PlasmoStyle gives every mode a distinct deterministic surface accent system', async () => {
+  const modes = [
+    {
+      variant: 'amoled-lava', kind: 'lens-blooms', detail: 'refracted-crescents',
+      minimumMarks: 12
+    },
+    {
+      variant: 'chromatic-wave', kind: 'pearl-rakes', detail: 'spectral-threading',
+      minimumMarks: 24
+    },
+    {
+      variant: 'ultraviolet-current', kind: 'vortex-coronas', detail: 'flux-needles',
+      minimumMarks: 40
+    }
+  ];
+  const kinds = new Set();
+  const signatures = new Set();
+
+  for (const mode of modes) {
+    const style = new PlasmoStyle({
+      seed: 1977,
+      variant: mode.variant,
+      colorway: mode.variant === 'ultraviolet-current' ? 'ultraviolet' : 'prism',
+      renderScale: 0.54
+    });
+    style.width = 120;
+    style.height = 220;
+    await style.init(sampleData);
+
+    const canvas = createCanvas(120, 220);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 120, 220);
+    style._renderRaster(ctx, 120, 220);
+    const before = ctx.getImageData(0, 0, 120, 220).data;
+
+    const duplicate = createCanvas(120, 220);
+    const duplicateCtx = duplicate.getContext('2d');
+    duplicateCtx.drawImage(canvas, 0, 0);
+
+    const result = style._renderModeAccents(ctx, 120, 220);
+    const duplicateResult = style._renderModeAccents(duplicateCtx, 120, 220);
+    const after = ctx.getImageData(0, 0, 120, 220).data;
+    const duplicatePixels = duplicateCtx.getImageData(0, 0, 120, 220).data;
+    let changedPixels = 0;
+    let exteriorChanges = 0;
+
+    for (let index = 0; index < before.length; index += 4) {
+      const change = Math.max(
+        Math.abs(after[index] - before[index]),
+        Math.abs(after[index + 1] - before[index + 1]),
+        Math.abs(after[index + 2] - before[index + 2])
+      );
+      if (change === 0) continue;
+      changedPixels++;
+      if (Math.max(before[index], before[index + 1], before[index + 2]) < 3) {
+        exteriorChanges++;
+      }
+    }
+
+    assert.deepEqual(result, duplicateResult);
+    assert.equal(result.kind, mode.kind);
+    assert.equal(result.detail, mode.detail);
+    assert.ok(result.marks >= mode.minimumMarks);
+    assert.ok(changedPixels > 700, `${mode.kind} should visibly enrich the surface`);
+    assert.equal(
+      pixelStats(after).signature,
+      pixelStats(duplicatePixels).signature,
+      `${mode.kind} should remain deterministic`
+    );
+    if (mode.variant !== 'ultraviolet-current') {
+      assert.equal(
+        exteriorChanges,
+        0,
+        `${mode.kind} should preserve AMOLED negative space`
+      );
+    }
+    kinds.add(result.kind);
+    signatures.add(pixelStats(after).signature);
+  }
+
+  assert.equal(kinds.size, 3);
+  assert.equal(signatures.size, 3);
+});
+
 test('PlasmoStyle provides three structurally distinct lava visual grammars', async () => {
   const grammars = [
-    { variant: 'amoled-lava-drift', direction: 'drift', minimumBlobs: 10 },
-    { variant: 'amoled-lava-rise', direction: 'rise', minimumBlobs: 12 },
-    { variant: 'amoled-lava-islands', direction: 'islands', minimumBlobs: 10 }
+    {
+      variant: 'amoled-lava-drift', direction: 'drift', accent: 'shear-ribbons',
+      minimumBlobs: 10, minimumMarks: 20
+    },
+    {
+      variant: 'amoled-lava-rise', direction: 'rise', accent: 'bubble-columns',
+      minimumBlobs: 12, minimumMarks: 20
+    },
+    {
+      variant: 'amoled-lava-islands', direction: 'islands', accent: 'topographic-shores',
+      minimumBlobs: 10, minimumMarks: 16
+    }
   ];
   const signatures = new Set();
+  const accentSignatures = new Set();
 
   for (const grammar of grammars) {
     const { style, pixels } = await renderStyle(grammar.variant, 812, 150, 280, 'ultraviolet');
@@ -314,9 +801,38 @@ test('PlasmoStyle provides three structurally distinct lava visual grammars', as
       assert.ok(style.blobs.some(blob => blob.radius <= 0.075));
     }
     signatures.add(pixelStats(pixels).signature);
+
+    const canvas = createCanvas(150, 280);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 150, 280);
+    style._renderRaster(ctx, 150, 280);
+    const basePixels = ctx.getImageData(0, 0, 150, 280).data;
+    const accent = style._renderLavaDirectionAccents(ctx, 150, 280);
+    const accentedPixels = ctx.getImageData(0, 0, 150, 280).data;
+    let exteriorChanges = 0;
+    for (let index = 0; index < basePixels.length; index += 4) {
+      const wasBlack = Math.max(
+        basePixels[index], basePixels[index + 1], basePixels[index + 2]
+      ) === 0;
+      const changed = Math.max(
+        Math.abs(accentedPixels[index] - basePixels[index]),
+        Math.abs(accentedPixels[index + 1] - basePixels[index + 1]),
+        Math.abs(accentedPixels[index + 2] - basePixels[index + 2])
+      ) > 0;
+      if (wasBlack && changed) exteriorChanges++;
+    }
+    assert.equal(accent.kind, grammar.accent);
+    assert.ok(
+      accent.marks >= grammar.minimumMarks,
+      `${accent.kind} should draw at least ${grammar.minimumMarks} marks, got ${accent.marks}`
+    );
+    assert.equal(exteriorChanges, 0, `${accent.kind} should preserve pure-black space`);
+    accentSignatures.add(pixelStats(accentedPixels).signature);
   }
 
   assert.equal(signatures.size, grammars.length);
+  assert.equal(accentSignatures.size, grammars.length);
 });
 
 test('PlasmoStyle exposes seven genuinely different lava colorways', async () => {

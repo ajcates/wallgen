@@ -50,7 +50,9 @@ const STYLE_MAP = {
   'trap': '../src/styles/TrapStyle.js',
   'oil': '../src/styles/OilSlickStyle.js',
   'beveled': '../src/styles/BeveledCircuitsStyle.js',
-  'plasmo': '../src/styles/PlasmoStyle.js'
+  'plasmo': '../src/styles/PlasmoStyle.js',
+  'materialplanes': '../src/styles/MaterialPlanesStyle.js',
+  'laser-smoke': '../src/styles/LaserLiquidSmokeStyle.js'
 };
 
 // API: List all available styles

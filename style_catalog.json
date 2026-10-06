@@ -187,5 +187,26 @@
     "description": "Warped contour bundles and stirred AMOLED lava.",
     "module": "./src/styles/PlasmoStyle.js",
     "class": "PlasmoStyle"
+  },
+  {
+    "id": "materialplanes",
+    "name": "Material Planes",
+    "description": "Concrete, brushed metal, woven canvas, and tinted glass at orderly angles.",
+    "module": "./src/styles/MaterialPlanesStyle.js",
+    "class": "MaterialPlanesStyle"
+  },
+  {
+    "id": "laser-smoke",
+    "name": "Laser Liquid Smoke",
+    "description": "AMOLED liquid smoke sky cut by refracted neon laser beams.",
+    "module": "./src/styles/LaserLiquidSmokeStyle.js",
+    "class": "LaserLiquidSmokeStyle"
+  },
+  {
+    "id": "gearworks",
+    "name": "Gear Works",
+    "description": "An abstract flat-lay of toothed gears, hydraulic pistons, pipework, and rivets on oiled steel.",
+    "module": "./src/styles/GearWorksStyle.js",
+    "class": "GearWorksStyle"
   }
 ]

@@ -1,10 +1,13 @@
 import { Style } from '../core/Style.js';
+import { createCanvas } from '@napi-rs/canvas';
 import { randomRange, mapRange, lerp } from '../utils/math.js';
 import * as colorUtils from '../utils/color.js';
 
 /**
  * GlitchStyle (AMOLED Ultra): An advanced digital corruption style.
  * Features: True black base, Digital Bus background, Pixel Sorting simulations,
+ * pixel-melt drips, datamosh block displacement, giant corrupted emoji,
+ * vertical pixel-displacement tears, full-frame RGB channel split, neon bloom,
  * Wireframe fragments, Corrupted UI blocks, and high-fidelity chromatic shifts.
  */
 export class GlitchStyle extends Style {
@@ -22,6 +25,10 @@ export class GlitchStyle extends Style {
     this.wireframes = [];
     this.dataStreams = [];
     this.macroblocks = [];
+    this.meltColumns = [];
+    this.moshBlocks = [];
+    this.emojis = [];
+    this.verticalTears = [];
   }
 
   async init(data) {
@@ -37,6 +44,10 @@ export class GlitchStyle extends Style {
     this._generateWireframes(data);
     this._generateDataStreams(data);
     this._generateMacroblocks(data);
+    this._generateMeltColumns(data);
+    this._generateMoshBlocks(data);
+    this._generateEmojis(data);
+    this._generateVerticalTears(data);
   }
 
   _initPalette(data) {
@@ -74,7 +85,9 @@ export class GlitchStyle extends Style {
 
   _generateSlices(data) {
     this.slices = [];
-    const intensity = 120 * this.noiseLevel;
+    // Fewer horizontal glitch bars than before — the look now leans on
+    // pixel melt/datamosh for corruption instead of stacks of scanlines.
+    const intensity = 40 * this.noiseLevel;
     for (let i = 0; i < intensity; i++) {
         this.slices.push({
             y: randomRange(0, this.height),
@@ -185,8 +198,84 @@ export class GlitchStyle extends Style {
       }
   }
 
+  _generateMeltColumns(data) {
+      this.meltColumns = [];
+      const count = Math.floor(randomRange(14, 22));
+      for (let i = 0; i < count; i++) {
+          this.meltColumns.push({
+              x: randomRange(0, this.width),
+              w: randomRange(2, 14),
+              sourceY: randomRange(0, this.height * 0.55),
+              sliceH: randomRange(6, 24),
+              dripLength: randomRange(this.height * 0.2, this.height * 0.75),
+              speed: randomRange(0.4, 1.4)
+          });
+      }
+  }
+
+  _generateMoshBlocks(data) {
+      this.moshBlocks = [];
+      const count = Math.floor(randomRange(10, 18));
+      for (let i = 0; i < count; i++) {
+          const w = randomRange(60, 260);
+          const h = randomRange(20, 90);
+          this.moshBlocks.push({
+              sx: randomRange(0, Math.max(1, this.width - w)),
+              sy: randomRange(0, Math.max(1, this.height - h)),
+              w, h,
+              dx: randomRange(-140, 140),
+              dy: randomRange(-40, 60),
+              repeat: Math.floor(randomRange(1, 4)),
+              stretch: Math.random() > 0.6 ? randomRange(1.3, 3) : 1
+          });
+      }
+  }
+
+  _generateEmojis(data) {
+      this.emojis = [];
+      const pool = ['💀', '👾', '⚠️', '🔥', '💥', '⚡', '🧟', '🛑', '📡', '🌀', '🐛', '☢️', '👁️', '🚨'];
+      const count = Math.floor(randomRange(2, 4));
+      const used = new Set();
+      for (let i = 0; i < count; i++) {
+          let glyph = pool[Math.floor(Math.random() * pool.length)];
+          let attempts = 0;
+          while (used.has(glyph) && attempts < pool.length) {
+              glyph = pool[Math.floor(Math.random() * pool.length)];
+              attempts++;
+          }
+          used.add(glyph);
+          this.emojis.push({
+              glyph,
+              x: randomRange(this.width * 0.15, this.width * 0.85),
+              y: randomRange(this.height * 0.18, this.height * 0.75),
+              size: randomRange(this.width * 0.16, this.width * 0.3),
+              rotation: randomRange(-0.15, 0.15),
+              opacity: randomRange(0.6, 0.95),
+              splitOffset: randomRange(4, 24)
+          });
+      }
+  }
+
+  _generateVerticalTears(data) {
+      // Complements the horizontal slice bars with real vertical pixel
+      // displacement — columns of the frame torn and shifted up/down.
+      this.verticalTears = [];
+      const count = Math.floor(randomRange(8, 14));
+      for (let i = 0; i < count; i++) {
+          const w = randomRange(4, 36);
+          this.verticalTears.push({
+              x: randomRange(0, Math.max(1, this.width - w)),
+              w,
+              offset: randomRange(-this.height * 0.18, this.height * 0.18),
+              tintColor: this.glitchColors[Math.floor(Math.random() * this.glitchColors.length)],
+              tint: Math.random() > 0.5
+          });
+      }
+  }
+
   render(ctx, width, height) {
     this._renderBackground(ctx, width, height);
+    this._renderEmojis(ctx);
     this._renderByteNoise(ctx, width, height);
     this._renderMacroblocks(ctx);
     this._renderDigitalNoise(ctx, width, height);
@@ -194,7 +283,10 @@ export class GlitchStyle extends Style {
     this._renderDataStreams(ctx);
     this._renderWireframes(ctx);
     this._renderPixelSorts(ctx);
+    this._renderPixelMelt(ctx, width, height);
+    this._renderDatamosh(ctx, width, height);
     this._renderSlices(ctx, width, height);
+    this._renderVerticalTears(ctx, width, height);
     this._renderWaveDistortion(ctx, width, height);
     this._renderChromaticAberration(ctx);
     this._renderUIBlocks(ctx);
@@ -204,6 +296,8 @@ export class GlitchStyle extends Style {
     this._renderDeadPixels(ctx, width, height);
     this._renderColorInversion(ctx, width, height);
     this._renderDataStaircase(ctx, width, height);
+    this._renderNeonBloom(ctx, width, height);
+    this._renderGlobalChannelSplit(ctx, width, height);
     this._renderOverlayText(ctx, width, height);
   }
 
@@ -253,12 +347,12 @@ export class GlitchStyle extends Style {
 
   _renderBlockyScanlines(ctx, width, height) {
       ctx.save();
-      const count = 10;
+      const count = 3;
       for (let i = 0; i < count; i++) {
           const y = randomRange(0, height);
-          const h = randomRange(2, 20);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-          if (Math.random() > 0.7) ctx.fillStyle = 'rgba(255, 0, 85, 0.1)';
+          const h = randomRange(2, 16);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+          if (Math.random() > 0.7) ctx.fillStyle = 'rgba(255, 0, 85, 0.06)';
           ctx.fillRect(0, y, width, h);
       }
       ctx.restore();
@@ -526,11 +620,12 @@ export class GlitchStyle extends Style {
 
   _renderScanlines(ctx, width, height) {
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    for (let i = 0; i < height; i += 4) {
-        ctx.fillRect(0, i, width, 2);
+    // Thinned way down — this is now a faint CRT hint, not the dominant texture.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    for (let i = 0; i < height; i += 9) {
+        ctx.fillRect(0, i, width, 1);
     }
-    
+
     // Vignette
     const grad = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, height);
     grad.addColorStop(0, 'transparent');
@@ -588,6 +683,143 @@ export class GlitchStyle extends Style {
               }
           }
       }
+      ctx.restore();
+  }
+
+  _renderEmojis(ctx) {
+      this.emojis.forEach(e => {
+          ctx.save();
+          ctx.translate(e.x, e.y);
+          ctx.rotate(e.rotation);
+          ctx.font = `${e.size}px "Noto Color Emoji", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          // Duplicate offset ghosts so the emoji reads as glitched from the start —
+          // later chromatic/mosh passes will smear these further.
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = 0.35;
+          ctx.fillText(e.glyph, -e.splitOffset, 0);
+          ctx.fillText(e.glyph, e.splitOffset, (Math.random() - 0.5) * 10);
+
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = e.opacity;
+          ctx.fillText(e.glyph, 0, 0);
+          ctx.restore();
+      });
+  }
+
+  _renderPixelMelt(ctx, width, height) {
+      // Drags thin horizontal bands of already-rendered pixels downward with
+      // decaying opacity, producing literal melting/dripping pixel streaks.
+      ctx.save();
+      this.meltColumns.forEach(col => {
+          const stepH = Math.max(1, col.sliceH * 0.5);
+          const steps = Math.floor(col.dripLength / stepH);
+          for (let s = 0; s < steps; s++) {
+              const dy = col.sourceY + s * stepH * col.speed;
+              if (dy + col.sliceH > height) break;
+              const alpha = mapRange(s, 0, steps, 0.85, 0.04);
+              const jitterX = col.x + (Math.random() - 0.5) * 4;
+              ctx.globalAlpha = Math.max(0, alpha);
+              ctx.drawImage(
+                  ctx.canvas,
+                  col.x, col.sourceY, col.w, col.sliceH,
+                  jitterX, dy, col.w, col.sliceH
+              );
+          }
+      });
+      ctx.globalAlpha = 1.0;
+      ctx.restore();
+  }
+
+  _renderDatamosh(ctx, width, height) {
+      // Copies blocks of already-rendered content to nearby offsets, optionally
+      // stretched — the classic corrupted-motion-vector "moshing" look.
+      ctx.save();
+      this.moshBlocks.forEach(b => {
+          for (let r = 1; r <= b.repeat; r++) {
+              const t = r / b.repeat;
+              const destW = b.w;
+              const destH = b.h * (1 + (b.stretch - 1) * t);
+              const destX = Math.min(Math.max(b.sx + b.dx * t, 0), width - destW);
+              const destY = Math.min(Math.max(b.sy + b.dy * t, 0), height - destH);
+              ctx.globalAlpha = mapRange(r, 1, b.repeat, 0.8, 0.2);
+              ctx.drawImage(ctx.canvas, b.sx, b.sy, b.w, b.h, destX, destY, destW, destH);
+          }
+      });
+      ctx.globalAlpha = 1.0;
+      ctx.restore();
+  }
+
+  _renderVerticalTears(ctx, width, height) {
+      // Copies a vertical strip of already-rendered pixels and pastes it back
+      // shifted up/down — a real tear, distinct axis from the horizontal slices.
+      ctx.save();
+      this.verticalTears.forEach(t => {
+          ctx.globalAlpha = 0.95;
+          ctx.drawImage(ctx.canvas, t.x, 0, t.w, height, t.x, t.offset, t.w, height);
+          if (t.tint) {
+              ctx.globalCompositeOperation = 'screen';
+              ctx.globalAlpha = 0.25;
+              ctx.fillStyle = t.tintColor;
+              ctx.fillRect(t.x, 0, t.w, height);
+              ctx.globalCompositeOperation = 'source-over';
+          }
+      });
+      ctx.globalAlpha = 1.0;
+      ctx.restore();
+  }
+
+  _renderNeonBloom(ctx, width, height) {
+      // Soft glow around bright neon content — makes cyan/magenta/emoji pop
+      // like real AMOLED bleed instead of flat, unlit color.
+      const snapshot = createCanvas(width, height);
+      const sctx = snapshot.getContext('2d');
+      sctx.drawImage(ctx.canvas, 0, 0);
+
+      ctx.save();
+      // Kept subtle on purpose — this is a halo around already-bright pixels,
+      // not a global haze. Too strong and it kills the true-black AMOLED base.
+      ctx.filter = 'blur(9px)';
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.18;
+      ctx.drawImage(snapshot, 0, 0);
+      ctx.filter = 'none';
+      ctx.restore();
+  }
+
+  _renderGlobalChannelSplit(ctx, width, height) {
+      // True full-frame RGB channel isolation (not just tinted rectangles):
+      // split the frame into a red-only layer and a cyan-only layer, then
+      // screen them back offset in opposite directions.
+      const shift = randomRange(4, 12) * this.noiseLevel;
+      const angle = Math.random() * Math.PI * 2;
+      const dx = Math.cos(angle) * shift;
+      const dy = Math.sin(angle) * shift * 0.25;
+
+      const base = createCanvas(width, height);
+      base.getContext('2d').drawImage(ctx.canvas, 0, 0);
+
+      const redLayer = createCanvas(width, height);
+      const rctx = redLayer.getContext('2d');
+      rctx.drawImage(base, 0, 0);
+      rctx.globalCompositeOperation = 'multiply';
+      rctx.fillStyle = '#ff0000';
+      rctx.fillRect(0, 0, width, height);
+
+      const cyanLayer = createCanvas(width, height);
+      const cctx = cyanLayer.getContext('2d');
+      cctx.drawImage(base, 0, 0);
+      cctx.globalCompositeOperation = 'multiply';
+      cctx.fillStyle = '#00ffff';
+      cctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.38;
+      ctx.drawImage(redLayer, dx, dy);
+      ctx.drawImage(cyanLayer, -dx, -dy);
       ctx.restore();
   }
 

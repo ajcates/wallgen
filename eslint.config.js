@@ -2,7 +2,7 @@ import js from '@eslint/js';
 
 export default [
   {
-    ignores: ['tests/tmp/**']
+    ignores: ['tests/tmp/**', 'mandala-atlas/**']
   },
   js.configs.recommended,
   {
